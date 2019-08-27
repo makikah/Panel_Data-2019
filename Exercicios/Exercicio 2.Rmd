@@ -1,0 +1,120 @@
+---
+title: "Trabalho ao Final"
+author: "Henri Makika"
+date: "Julho 30, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      fig.width = 12, fig.height = 8)
+```
+
+## Exercicio 2 
+
+### Leitura de dados
+
+
+```{r}
+library(readxl)
+library(stargazer)
+
+Data_Renewable <- read_excel("~/Videos/Inverno 2019/Exercicios/Data_Renewable.xlsx", na = "..")
+
+head(Data_Renewable[,5:10])
+
+summary(Data_Renewable[,5:10])
+```
+
+## Regression
+
+
+```{r}
+linregression = lm(renov ~ pib + pop, data = Data_Renewable)
+```
+
+### Lin-log 
+
+
+```{r}
+linlogregression = lm(renov ~ log(pib) + log(pop), data = Data_Renewable)
+```
+
+### Log-lin
+
+```{r}
+loglinregression = lm(log(renov + 1) ~ pib + pop, data = Data_Renewable)
+```
+
+### Log-log 
+
+```{r}
+loglogregression = lm(log(renov + 1) ~ log(pib) + pop, data = Data_Renewable)
+
+stargazer(linlogregression, loglinregression, loglogregression, 
+          type = "text", digits = 8, column.labels = c("Lin-log", "Log-lin",
+                                                       "Log-log"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+## Pooled end Panel Data
+
+```{r}
+Data_Renewable_Painel <- read_excel("~/Videos/Inverno 2019/Exercicios/Data_Renewable_Painel.xlsx", na = "..")
+Dados = Data_Renewable_Painel
+
+summary(Dados[,5:9])
+```
+
+## Regression panel
+
+```{r}
+library(plm)
+
+panel1 = plm(log(renov + 1) ~ log(pib) + log(pop), data = Dados, 
+             index = c("pais", "ano"), model = "within")
+```
+
+
+```{r}
+binano = Dados$ano
+n = length(binano)
+binary = rep(0, n)
+
+for (i in 1:n) {if(binano[i]>=1997 & (binano[i]<2005))binary[i] = 1}
+
+panel2 = plm(log(renov + 1) ~ log(pib) + log(pop) + binary, data = Dados, 
+             index = c("pais", "ano"), model = "within")
+
+panel3 = plm(log(renov + 1) ~ log(pib) + log(pop) + binary, data = Dados, index = c("pais", "ano"),
+             effect = "twoways", model = "within")
+
+
+stargazer(panel1, panel2, panel3, type = "text", digits = 5, column.labels = c("", "", ""),
+          keep.stat = NULL, out = "mrd.txt")
+```
+
+
+## Random Effects and Hausman
+
+```{r}
+randoweffect = plm(log(renov + 1) ~ log(pib) + log(pop), data = Dados,
+                   index = c("pais", "ano"), model = "random")
+
+randoweffect2 = plm(log(renov + 1) ~ log(pib) + log(pop) + binary + as.factor(ano), data = Dados,
+                   index = c("pais", "ano"), model = "random")
+
+stargazer(randoweffect, randoweffect2, type = "text", digits = 5, column.labels = c("", ""),
+          keep.stat = NULL, out = "mrd.txt")
+
+phtest(panel3, randoweffect)
+```
+
+On accept $H_{0}$, la statistique est significative. 
+
+
+
+
+
+
+

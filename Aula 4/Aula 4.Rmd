@@ -1,0 +1,121 @@
+---
+title: "Model for pooled data"
+author: "Henri Makika"
+date: "Julho 04, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## Data Agriculture climate
+
+```{r}
+library(readxl)
+library(stargazer)
+
+Data_AgricultureClimate <- read_excel("~/Videos/Inverno 2019/Aula 4/Data_AgricultureClimate.xls")
+
+head(Data_AgricultureClimate)
+
+summary(Data_AgricultureClimate)
+```
+
+## Regression 1
+
+
+```{r}
+loglinear = lm(log(vtotal) ~ log(areatotal) + (tempano) + (precano),
+               data = Data_AgricultureClimate)
+
+```
+
+## Regression 2
+
+```{r}
+loglinear2 = lm(log(vtotal) ~ log(areatotal) + (tempano) + (precano) + periodo,
+               data = Data_AgricultureClimate)
+
+```
+
+## Mudança no coefficients
+
+
+```{r}
+int_areatotal = Data_AgricultureClimate$areatotal*Data_AgricultureClimate$periodo
+
+loglinear3 = lm(log(vtotal) ~ log(areatotal) + (tempano) + (precano) + periodo
+                + (int_areatotal),
+               data = Data_AgricultureClimate)
+
+stargazer(loglinear, loglinear2, loglinear3, type = "text", digits = 5, 
+          column.labels = c("", "", ""), keep.stat = c('n','rsq','adj.rsq','f'), 
+          out = "mrd.txt")
+```
+
+## Data Panel
+
+L'objectif des données de panel est donc de contrôler les variables que la regréssion linéaire ne saura pas réaliser. Plusieures variables pour éviter les biais d'informations dans la regréssion. On peut donc créer une variable binaire pour controler les scénarios. 
+
+
+```{r}
+library(plm)
+
+panelregre = plm(log(vtotal) ~ log(areatotal) + tempano + precano, index = c("munic", "ano"),
+                 model = "within", data = Data_AgricultureClimate)
+
+stargazer(panelregre, type = "text", digits = 5, column.labels = c(""),
+          keep.stat = NULL, out = "mrd.txt")
+```
+
+```{r}
+panelregre2 = plm(log(vtotal) ~ log(areatotal) + tempano + precano, index = c("munic", "ano"),
+                  effect = "twoways", model = "within", data = Data_AgricultureClimate)
+
+stargazer(panelregre, panelregre2, type = "text", digits = 5, column.labels = c("", ""),
+          keep.stat = NULL, out = "mrd.txt")
+```
+
+
+## Random Effects and Hausman
+
+L'avantage des données en panel ce que le degré de liberté augmente $p(n-k) = s.e$, mais on perd l'efficience avec $E(\hat{\beta}) = 0$. En donnée de panel, on inclut *dummy* pour capter toute les informations constantes au long du temps. C'est à dire on contrôle toute les variables omis. (voir aula 4, p. 18, slides). $n$ égal recette = taille du modèle = amostra et $k$ égal numéro de variables.
+
+Dans le modèle *Random Effects* $e_{it}$ mesure la variance entre la ligne de regréssion et $C_{i}$ qui est la variable *dummy*, mesure la variance générale entre toute le ligne (aula 5, p. 3, slides). 
+
+```{r}
+random1 = plm(log(vtotal) ~ log(areatotal) + tempano, data = Data_AgricultureClimate,
+              index = c("munic", "ano"), model = "random")
+
+random2 = plm(log(vtotal) ~ log(areatotal) + tempano + as.factor(ano), 
+              data = Data_AgricultureClimate, index = c("munic", "ano"), model = "random")
+
+stargazer(random1, random2, type = "text", digits = 5, column.labels = c("", ""),
+          keep.stat = NULL, out = "mrd.txt")
+```
+
+## Hausman test
+
+Ce test compare la consistance de différents estimateurs alternatifs. Grâce à cela, ce test permet de vérifier si le modèle économétrique est approprié au cas traité par l'économiste.
+
+```{r}
+phtest(panelregre, random1)
+```
+
+```{r}
+phtest(panelregre2, random2)
+```
+
+Dans le deux cas, on accepte $H_{0}$. 
+
+
+
+
+
+
+
+
+
+
+

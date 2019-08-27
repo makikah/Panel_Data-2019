@@ -1,0 +1,101 @@
+---
+title: "Income Relative"
+author: "Henri Makika"
+date: "7/3/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## Income relative 
+
+
+```{r}
+library(readxl)
+library(stargazer)
+library(AER)
+library(MatchIt)
+
+Dados = read_excel("~/Videos/Inverno 2019/Aula 3/Data_RelativeIncome.xls")
+
+summary(Dados)
+```
+
+### Regression simples
+
+Il est question ici de l'article du professeur Gori (voir Gori 2013). 
+
+```{r}
+linear = lm(sufrnd ~ log(meanrndpcap), data = Dados) 
+```
+
+### Regression multiple
+
+```{r}
+linmultiple = lm(sufrnd ~ log(meanrndpcap) + log(rndpcap), data = Dados) #+ #(anos_est) + 
+                   #mulher + rural, data = Dados)
+#summary(linmultiple)
+stargazer(linear, linmultiple, type = "text", digits = 5, 
+          column.labels = c("Lin-model", "Multi-model"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+
+Interpretation se dit en terme de probabilité, puisque la variable dependente est binaire. variation de sufficence de revenu du voisin sur soi est de 0.14. (modèle 1). C'est $0.14 \%$ de probabilité de satisfaction. De (1) le modèle est super-estimé. Pourquoi ? Parce qu'on a pas considéré d'autres variables importantes pour conclure le modèle. La satisfaction à diminuer du fait que nous avons considéré d'autres variables de controles.  Il ne plus possible de dire qu'on a sur-estimé la regression.  
+
+
+## Exercice 2 
+
+Voir article Gori et al (). Titre : Saude e mercado do trabalho. 
+
+
+```{r}
+Donne = read_excel("~/Videos/Inverno 2019/Aula 3/Data_HealthIncome.xls")
+
+summary(Donne)
+```
+
+## Regression simple
+
+
+```{r}
+linsimple = lm(boasaude ~ (lnrnd) + fem + idade + escolar + declarante + rural, 
+               data = Donne)
+```
+
+## Variables instrumentales (IV)
+
+
+```{r}
+intrument = ivreg(boasaude ~ lnrnd + fem + idade + escolar + declarante + rural | .-lnrnd +
+                    cp + empr, data = Donne)
+
+stargazer(linsimple, intrument, type = "text", digits = 5, 
+          column.labels = c("", ""),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

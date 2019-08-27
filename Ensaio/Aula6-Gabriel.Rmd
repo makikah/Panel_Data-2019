@@ -1,0 +1,293 @@
+---
+title: "Problemas de Especificação"
+author: "Gabriel Petrini"
+date: "20 de setembro de 2018"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+  html_document:
+    code_folding: show
+    highlight: textmate
+    theme: united
+    toc: yes
+    toc_float: yes
+  slidy_presentation:
+    highlight: textmate
+    incremental: no
+  beamer_presentation:
+    colortheme: beaver
+    fig_caption: yes
+    fonttheme: serif
+    incremental: no
+    keep_tex: no
+    slide_level: 2
+    theme: Montpellier
+    toc: yes
+lang: pt-Br
+mainfont: times
+geometry: margin=1in
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r warning=FALSE, message=FALSE}
+# Carregando os pacotes
+library(readxl) # Carrega dados do excel
+library(knitr) # Para Kable
+#library(sjPlot) # Para tidy tables (tab_model)
+library(stargazer) # Para tabelas comparativas
+library(broom) # Para transformar lm em tibble
+library(normtest) # Para testar normalidade dos resíduos
+library(car) # Teste wald e fiv
+library(lmtest) # teste resert
+library(ggplot2) # Para gráficos
+library(dplyr) # Pipe operator
+```
+
+## Problemas Adicionais de Especificação e de Dados {.AllowBreaks}
+
+Este problema está normalmente associado à violação da hipótese 3, qual seja:
+
+\[
+E(u_j|X_1 \ldots X_j)
+\]
+
+Violada esta hipótese, o erro $u$ e $x$ tornam-se correlacionados e, consequentemente, tal variável deixa de ser **exógena**. Sendo assim, omitindo tal variável implica em uma má especificação do modelo. Portanto, omiss~ao de uma vari´avel importante pode causar correlação entre o erro e vari´aveis explicativas, o que pode gerar **viés** e
+**inconsistência** em estimadores MQO.
+Outra fonte de má especificação do modelo é o erro da **forma funcional** do modelo.
+
+### Testes de erros de especificação {.AllowBreaks}
+
+Uma das formas de verificar a especificação do modelo é através da análise da estimativa da significância estatística pelo teste t. Já para testar a relevância de mais de uma variável, deve ser utilizado o teste LM em que a hipótese nula é que tais termos são nulos. No entanto, sob a presença de multicolinearidade em que a variância é inflada, pode implicar em não rejeitar a hipótese nula e com isso eliminar termos significantes.
+
+### Exemplo {.AllowBreaks}
+
+
+Importando dados:
+
+```{r}
+hprice <- read_excel("~/Videos/Inverno 2019/Dados/hprice.xlsx")
+head(hprice) %>% kable()
+tail(hprice) %>% kable() 
+```
+
+Plotando série:
+
+```{r}
+plot(x = hprice[,-1], panel = panel.smooth)
+```
+
+Fazendo uma análise descritiva dos dados:
+
+```{r}
+summary(hprice[,-1]) %>% kable(digits = 0)
+boxplot(hprice[,-1])
+cor(hprice[,-1]) %>% kable(digits = 2)
+```
+
+O problema de colinearidade pode ser analisado a partir da matriz de correlação. Se houver uma correlação baixa (abaixo de 70%) entre as variáveis independentes, pode ser sinal de multicolinearidade. O desejado é a variável dependente ter uma correlação elevada com as variáveis independentes e elas tenha baixa correlação entre si.
+
+#### Construção do modelo linear {.AllowBreaks}
+
+```{r}
+modelo_linear <- lm(data = hprice, 
+                    formula = PRICE ~
+                      LOTSIZE + 
+                      SQRFT + 
+                      BDRMS)
+summary(modelo_linear) %>% tidy() %>% kable(digits = 2, align = 'c')
+glance(modelo_linear)[1:5] %>% kable()
+```
+
+Avaliando multicolinearidade
+
+```{r}
+t(vif(modelo_linear)) %>% kable(digits = 2)
+```
+
+Outra forma é criar uma regressão entre as variáveis independentes e verificar se o $\overline R^2$ é elevado
+
+```{r}
+modelo_linear_aux1 <- lm(data = hprice, 
+                         formula = LOTSIZE ~
+                           SQRFT + 
+                           BDRMS)
+glance(modelo_linear_aux1)[1:5] %>% kable(digits = 2)
+modelo_linear_aux2 <- lm(data = hprice, 
+                         formula = SQRFT ~
+                           LOTSIZE + 
+                           BDRMS)
+glance(modelo_linear_aux2)[1:5] %>% kable(digits = 2)
+modelo_linear_aux3 <- lm(data = hprice, 
+                         formula = BDRMS ~
+                           LOTSIZE + 
+                           SQRFT)
+glance(modelo_linear_aux3)[1:5] %>% kable(digits = 2)
+```
+
+Conclui-se portanto que não há indícios de multicolinearidade. Dito isso, procura-se melhorar a especificação do modelo incluindo um termo quadrático.
+
+```{r}
+hprice_quad <- lm(data = hprice, 
+                  formula = PRICE ~
+                    LOTSIZE +
+                    I(LOTSIZE^2) + 
+                    SQRFT +
+                    I(SQRFT^2) + 
+                    BDRMS)
+summary(hprice_quad) %>% tidy() %>% kable(digits = 2)
+glance(hprice_quad)[1:5] %>%  kable(digits = 2)
+```
+
+Portanto, existem evidência que há uma relação não-linear entre preço e o tamanho do lote (LOTESIZE), mas o mesmo não pode ser dito em relação à área construída (SQRFT).
+
+Fazendo teste de restrição:
+
+```{r}
+restricao <-    linearHypothesis(hprice_quad, 
+                       hypothesis.matrix = c('I(LOTSIZE^2) = 0',
+                                             'I(SQRFT^2) = 0'),
+                       test = 'F')
+(restricao) %>%  kable()
+```
+
+Este teste avalia se tem contribuição **conjunta** entre as variáveis quadráticas. Em outras palavras, a não linearidade do preço está associada à área construída e tamanho da propriedade. Ao nível de significância de 5%, **rejeita-se** a hipótese nula e, portanto, rejeita-se a não contribuição conjunta das variáveis ao quadrado, ou seja, ao menos uma delas é não-nula.
+
+Apesar da forma funcional ser a mesma, o número de variávies é diferente e, portanto, **não** é possível comparar as especificações pelo $R^2$, mas pelo $\overline R^2$.
+
+## Teste de Reset
+
+Teste de Hamsey (1969) que testa erros de especificação de regrassão múltipla clássica em que a hipótese nula é que não há erros de especificação. Em outras palavras, a hipótese nula é que os termos não-lineares **não** são lineares, ou seja, $E(u_j | X_1 \ldots X_j) = 0$:
+
+\[
+\begin{cases}
+H0: \delta_1 = \ldots = \delta_j = 0\\
+H1: \text{Ao menos um}  \neq 0
+\end{cases}
+\]
+
+Para implementar este teste, no entato, requer quais funções não-lineares devem ser incluídas. No entanto, não há uma resposta definitiva sobre quais incluir. Ramsey (1969) argumenta que a inclusão de termos quadráticos (e cúbicos) pode ser adequado em muitas aplicações. Grosso modo, sugere-se a inclusão de tais termos.
+
+De acordo com o autor, a partir da regressão expandida (que inclui os termos quadráticos), verifica-se se há erros de especificação. Em outras palavras, partindo da versão expandida, se rejeitar a hipótese nula implica em rejeitar a necessidade de não-linearidade. Rejeitar a hipótese nula, portanto, é o mesmo que aceitar a necessidade das não-linearidades.
+
+### Exemplo
+
+```{r}
+regressao_reset <- lm(data = hprice,
+                      formula = PRICE ~
+                        LOTSIZE + 
+                        SQRFT + 
+                        BDRMS + 
+                        I(fitted(modelo_linear)^2) + # Termos do primeiro ajuste ao quadrado
+                        I(fitted(modelo_linear)^3) # Termos do primeiro ajuste ao cubo
+                      )
+summary(regressao_reset) %>% tidy() %>% kable(digits = 3)
+teste_reset <- linearHypothesis(model = regressao_reset, 
+                                hypothesis.matrix = c("I(fitted(modelo_linear)^2) = 0",
+                                                      "I(fitted(modelo_linear)^3) = 0"),
+                                test = 'F')
+teste_reset %>%  kable(digits = 3)
+
+reset(modelo_linear) %>% tidy() %>% kable()
+```
+
+A um nível de significância de 5% e um p-valor de `r round(teste_reset$"Pr(>F)"[2]*100, digits = 2)`%, rejeita-se a hipótese nula e, portanto, ao menos um dos termos não-lineares é significativo e, assim, a especificação linear não é a mais adequada.
+
+Para comparar, inclui-se apenas o termo não-linear LOTSIZE e em seguida aplicar o teste reset para verificar a qualidade desta especificação:
+
+```{r}
+regressao_reset_quad <- lm(data = hprice,
+                           formula = PRICE ~
+                             SQRFT + 
+                             BDRMS + 
+                             LOTSIZE + 
+                             I(LOTSIZE^2))
+summary(regressao_reset_quad) %>% tidy() %>% kable()
+reset(regressao_reset_quad) %>% tidy() %>% kable()
+```
+
+Conclui-se, portanto, que mesmo incluindo este termo quadrático, está **não** é a especificação correta a um nível de significância de 5% dado um p-valor de `r round(reset(regressao_reset_quad)$p.value*100, digits = 2)`%.
+
+## Teste de Davidson-MacKinnon (1981) (Modelos Non Nested)
+
+Este teste avalia um conjunto de modelos contendo distintos regressores. Diferentemente do teste anterior, supõe-se um especificação não-linear e, em seguida, testa-se a significância desta não-linearidade. No teste reset, fazia-se o caminho inverso, ou seja, da linearidade para a não-linearidade. 
+
+De acordo com Davidson-MacKinnon (1981), se o modelo linear se mantiver com
+$E(uj| X_1; X_2) = 0$, então os valores estimados do modelo não-linear são
+não significantes no linear. Além disso, diferentemente do teste Reset, sabe-se qual a não linearidade a ser assumida.
+Grosso modo, seja $\theta \tilde{y}$ os termos não-lineares, estima-se por MQO:
+
+\[
+Y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \theta\tilde{y} + u
+\]
+
+Se o modelo **linear** é adequado, então $\theta \tilde{y}$ deve ser não-significarivo, ou seja, nulo. Portanto, uma estatística t significante é **rejeição** da linearidade.
+
+### Exemplo
+
+Estimando a regressão com as não-linearidades:
+
+```{r}
+regressao_nlinear <- lm(data = hprice,
+                        formula = PRICE ~
+                          log(LOTSIZE) + 
+                          log(SQRFT) + 
+                          BDRMS)
+summary(regressao_nlinear) %>%  tidy() %>% kable(digits = 2)
+regressao_linear <- lm(data = hprice,
+                        formula = PRICE ~
+                          LOTSIZE + 
+                          SQRFT + 
+                          BDRMS + 
+                         fitted(regressao_nlinear))
+summary(regressao_linear) %>%  tidy() %>% kable(digits = 2)
+```
+
+Neste caso, verifica-se o parâmetro que multiplica os termos não-lineares, qual seja, `r regressao_linear$coefficients[5]` que possui um p-valor de `r round(regressao_linear$p.value[5]*100, digits = 2)`%. Portanto, rejeita-se a hipótese alternativa e, assim, essa regressão ampliada não é adequada. Comparando,
+
+```{r results='asis'}
+stargazer(modelo_linear, regressao_nlinear,
+          column.labels = c('Linear', "Log"),
+          keep.stat = c('n', "rsq", "adj.rsq", "f"))
+```
+
+Como o número de variáveis é o mesmo, é possível utilizar o $R^2$ como critério de seleção. O crítério de seleção é o modelo que tem menor variabilidade dos erros, portanto, adota-se o modelo log.
+
+
+## Critérios de Seleção de Modelos
+
+### R-Quadrado
+
+Comparar R² de dois ou mais modelos: variável dependente deve ser a mesma e o número de variáveis independentes deve ser o mesmo.
+
+### R-Quadrado ajustado
+
+Mais adequado para comparação de dois ou mais modelos com número de variáveis independentes distintos, mas a variável dependente deve ser a mesma.
+
+### Critério de Informação de Akaike
+
+Menor AIC, melhor:
+
+```{r}
+AIC(modelo_linear, regressao_nlinear) %>% kable()
+```
+
+
+**Conclusão:** Adota-se o modelo lin-log.
+
+### Critério de Informação de Schwarz
+
+Menor SIC (ou BIC), melhor:
+
+```{r}
+BIC(modelo_linear, regressao_nlinear) %>% kable()
+```
+
+
+
+**Conclusão:** Adota-se o modelo lin-log.

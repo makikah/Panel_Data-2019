@@ -1,0 +1,483 @@
+---
+title: "Endogeneity and Instrumental Variables Using the ivreg Package"
+author: "Henri Makika^[State University of Campinas, São Paulo. E-mail : hd.makika@gmail.com]"
+date: "Julho 10, 2019"
+output: pdf_document
+---
+
+\tableofcontents
+
+\newpage
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      fig.width = 8, fig.height = 6)
+```
+
+## 1 Introduction 
+
+Les variables instrumentales (IV) font référence à un ensemble de méthodes développées en économétrie à partir des années 1920 pour tirer des déductions causales dans des contextes où le traitement des intérêts ne peut être considéré de manière crédible comme attribué au hasard, même après avoir utilisé des covariables supplémentaires. Au cours des deux dernières décennies, ces méthodes ont attiré une attention considérable dans la littérature statistique. Bien que cette récente littérature statistique s'appuie sur la littérature économétrique antérieure, il existe néanmoins des différences importantes. Premièrement, la récente littérature statistique porte principalement sur le cas du traitement binaire. Deuxièmement, la littérature récente permet explicitement l'hétérogénéité des effets du traitement. Troisièmement, la littérature récente sur les variables instrumentales utilise explicitement le cadre de résultats potentiels utilisé par Neyman pour des expériences randomisées et généralisé en observation, voir par exemple Rubin (1974, 1978, 1990). Quatrièmement, dans les applications sur lesquelles se concentre cette littérature, y compris les expériences randomisées sur la non-conformité, les estimations en intention de traiter ou sous forme réduite présentent souvent un plus grand intérêt que dans les applications classiques d’équations simultanées en économétrie.
+
+La littérature statistique récente a été motivée en partie par la littérature économétrique antérieure sur les variables instrumentales, à commencer par Wright (1928), [voir la discussion sur l’origine des variables instrumentales dans Stock et Trebbi, 2003]. Cependant, il existe également d'autres antécédents, en dehors de la littérature des variables instrumentales économétriques traditionnelles, notamment le travail de Zelen sur les modèles d'encouragement (Zelen, 1979, 1990). Les premiers articles de la littérature statistique récente incluent Angrist, Imbens et Rubin (1996), Robins (1989) et McClellan et Newhouse (1994). Les revues récentes incluent Rosenbaum (2010), Vansteelandt, Bowden, Babanezhad et Goetghebeur (2011) et Hernan et Robins (2006). Bien que ces revues incluent de nombreuses références à la littérature économique antérieure, il serait peut-être utile de discuter de la littérature économétrique de manière plus détaillée afin de fournir des informations de base et une perspective sur l'applicabilité des méthodes de variables instrumentales dans d'autres domaines.
+
+Les méthodes de variables instrumentales constituent un élément central du canon de l'économétrie depuis la première moitié du XXe siècle et continuent de faire partie intégrante de la plupart des manuels de premier et de second cycle (par exemple, Angrist et Pischke, 2008; Bowden et Turkington, 1984; Greene, 2011; Hayashi, 2000; Manski, 1995; Stock et Watson, 2010; Wooldridge, 2002, 2008). Comme les statisticiens Fisher et Neyman (Fisher, 1925; Neyman, 1923), des économétriciens tels que Wright (1928), Working (1927), Tinbergen (1930) et Haavelmo (1943) étaient intéressés par des inférences causales, dans leur cas l'effet des politiques économiques sur le comportement économique. Cependant, contrairement à la littérature statistique sur l'inférence causale, le point de départ de ces économétriciens n'était pas l'expérience randomisée. Dès le départ, il a été reconnu que, dans les environnements étudiés, les causes ou les traitements n'étaient pas attribués à des unités passives (agents économiques dans leur environnement tels que des individus, des ménages, des entreprises ou des pays).
+
+Au lieu de cela, les agents économiques influencent activement, ou même explicitement, le niveau de traitement qu'ils reçoivent. Le choix, plutôt que le hasard, a été le point de départ de la réflexion sur le mécanisme d’affectation dans la littérature en économétrie. Dans cette perspective, les unités recevant le traitement actif sont différentes de celles recevant le traitement de contrôle, pas seulement en raison de la réception du traitement: elles choisissent de recevoir le traitement actif car elles sont différentes pour commencer. Cela rend le traitement potentiellement endogène et crée ce que l’on appelle parfois dans la littérature économétrique le problème de sélection (Heckman, 1979).
+
+Les premiers travaux d'économétrie sur les variables instrumentales n'avaient pas beaucoup d'impact sur la réflexion dans la communauté des statistiques. Bien que certains travaux techniques sur les propriétés d’échantillons volumineux de divers estimateurs aient été publiés dans des journaux de statistiques (par exemple, le très influent article d’Anderson et Rubin (1948)), les applications de non-économistes étaient rares. On ne sait pas exactement quelles en sont les raisons. L'une des possibilités est le fait que les premiers travaux sur les variables instrumentales étaient étroitement liés à des questions économiques de fond (par exemple, les interventions sur les marchés), en utilisant des concepts économiques théoriques qui peuvent sembler non pertinents ou difficiles à traduire dans d'autres domaines (par exemple, l'offre et la demande) . Cela a peut-être suggéré aux non-économistes que les méthodes de variables instrumentales en général avaient une applicabilité limitée en dehors de l'économie. L'utilisation de concepts économiques n'était pas tout à fait inévitable, car les hypothèses critiques sur lesquelles reposent les méthodes de variables instrumentales sont substantielles et nécessitent une connaissance subtile de la matière(nous le verrons avec l'exemple ci-bas). Une autre raison peut être que, bien que les premiers travaux de Tinbergen et Haavelmo aient utilisé une notation très similaire à celle que Rubin (1974) a appelée par la suite la notation du résultat potentiel, la littérature s'est vite orientée vers une notation n'impliquant que des résultats réalisés ou observés. Voir pour une perspective historique Hendry et Morgan (1992) et Imbens (1997). Cette notation du résultat obtenu qui reste courante dans les manuels d'économétrie masque les liens entre les travaux de Fisher et Neyman sur les expériences randomisées et la littérature sur les variables instrumentales. Ce n’est que dans les années 1990 que les économétriciens sont revenus à la notation des résultats potentiels pour les questions de causalité (par exemple, Heckman, 1990, Manski, 1990; Imbens et Angrist, 1994), facilitant ainsi l’instauration d’un dialogue avec les statisticiens sur les méthodes de variable instrumentale.
+
+Il sied de noter que, les premiers travaux en économétrie sont utiles pour comprendre la littérature relative aux variables instrumentales modernes et, en outre, potentiellement utiles pour améliorer les applications de ces méthodes et identifier les instruments potentiels. Ces méthodes peuvent en fait être utiles dans de nombreux contextes que les statisticiens étudient. L'exposition au traitement est rarement une simple question de hasard ou de choix. Les deux aspects sont importants et aident à comprendre quand les inférences causales sont crédibles et quand elles ne le sont pas. Ce faisant, notre objectif dans ce papier est donc de démontrer techniquement comment identifier les instruments potentiels dans l'analyse économique (partie 1) et résoudre ce problème à partir d'utilisation des données en panel(partie 2).  
+
+## 2 Variables instrumentales
+
+À la base, les variables instrumentales changent les incitations pour les agents de choisir un niveau de traitement particulier, sans affecter les résultats potentiels associés à ces niveaux de traitement. Prenons un exemple de programme de formation professionnelle dans lequel le chercheur s'intéresse à l'effet moyen du programme de formation sur les gains. Chaque individu est caractérisé par deux résultats de gains potentiels, les gains en fonction de la formation et les gains en l'absence de formation. Chaque personne choisit de participer ou non en fonction de ses avantages nets perçus. Comme indiqué dans Athey et Stern (1998), il est important que ces avantages nets diffèrent des revenus. Vous le ferez par les coûts associés à la participation à ce régime. Supposons qu'il existe une variation dans les coûts encourus par les individus pour participer au programme de formation. Les coûts sont définis au sens large et peuvent inclure le temps de trajet pour se rendre dans les installations du programme ou l’effort requis pour s’informer sur le programme. De plus, supposons que ces coûts soient indépendants des résultats potentiels. C'est une hypothèse forte, souvent rendue plus plausible par le conditionnement sur des covariables. Les mesures du coût de la participation peuvent alors servir de variables instrumentales et aider à identifier les effets causals du programme. En fin de compte, nous comparons les gains des personnes à faible coût de participation au programme avec ceux des personnes à coût de participation élevé et attribuons la différence de gains moyens à la hausse du taux de participation au programme entre les deux groupes.
+
+Dans presque tous les cas, l'hypothèse selon laquelle il n'y a pas d'effet direct de la modification des incitations sur les résultats potentiels est controversée et doit être évaluée au cas par cas. La deuxième partie de l’hypothèse, selon laquelle les coûts sont indépendants des résultats potentiels, peut-être après l’ajustement des covariables, est qualitativement très différente. Dans certains cas, il est satisfait par la conception, par exemple si les incitations sont randomisées. Dans les études d’observation, il s’agit d’une hypothèse de fond, non fondée, qui peut être plus plausible ou du moins à peu près durable après le conditionnement en covariables. Par exemple, dans un certain nombre d'études, les chercheurs ont utilisé la distance physique par rapport aux installations comme instrument d'exposition aux traitements disponibles dans ces installations. De telles études incluent McClellan et Newhouse (1994) et Baiocchi, Small, Lorch et Rosenbaum (2010) qui utilisent la distance à des hôpitaux dotés de capacités particulières comme instrument de traitement associé à ces capacités, après conditionnement à une distance du centre médical le plus proche, et Card. (1995), qui utilise la distance aux collèges comme un instrument pour fréquenter un collège.
+
+## 3 Packages & définitions
+
+```{r}
+library(readxl)     # read data excel
+library(stargazer)  # Various programing for tables
+library(ggplot2)    # Various programing tools for plotting data
+library(AER)        # Applied Econometrics tests
+library(tidyverse)  # Modern data science library 
+library(plm)        # Panel data analysis library
+library(car)        # Companion to applied regression 
+library(gplots)     # Various programing tools for plotting data
+library(tseries)    # For timeseries analysis
+library(lmtest)     # For hetoroskedasticity analysis
+```
+
+Nous prénons l'exemple de salaire et vérifions s'il est sujet d'endogénéité de la variable expérience. Il s'agit donc d'un modèle avec une supposée variable instrumental. *Une variable explicative est endogène*, si toute variable explicative dans un modèle de régression linéaire qui est corrélée au terme d'erreur.
+
+*Problème d'endogénéité*: deux  ou plusieures variables sont déterminées conjointement dans un modèle, par exemple: variables prix et quantité dans un système d'offre et de demande. *Causes d'endogénéité*: (i) omission de variables pertinentes en corrélation avec $x_1,..., x_k$; (ii) erreurs de mesure en $x_1,..., x_k$, par exemple, un proxy mal spécifié; (iii) la simultanéité entre $y$ et une ou plusieures variables explicatives. *Conséquences*: les estimateurs du moindre carré ordinaire (MCO) deviennent biaisés, incohérents et inefficaces. *Solution*: employer des variables instrumentales dans le but de faciliter la recherche d’estimateurs cohérents.
+
+Une fois qu'on a un modèle où la covariance entre les variables explicatives et les erreurs sont non nulles, une variable $z$ est considérée, (i) Pas de corrélation avec $\mu$ ne peut être observée et (ii) en corrélation qu'avec $x$. On appelle alors $z$ de variable instrumentale ou tout simplement $z$ est l'instrument de $x$.
+
+Lorsque la régression réalisée pause un problème d'endogénéite, la conséquence ce que les estimateurs des moindres carrés ordinaires deviennent biaisés. Par conséquant, il est souhaitable d'utiliser les estimateurs des moindres carrés en deux étapes (MQ2E). Lorsque plusieures variables instrumentales sont requises pour une variable endogène (c’est-à-dire que l’équation structurelle est suridentifiée). Supposons le modèle structurel suivant :
+
+$$y_1 = \beta_0 + \beta_1 y_2 + \beta_2 z_1 + \mu_1,$$
+
+(i) on suppose que l’une des variables explicatives est endogène $y_2$ de l’équation structurelle ci-dussus. En supposant alors l'existence de $z_2$ et $z_3$ corrélés à $y_2$ et non corrélés à $\mu_1$; On arrive à la forme réduite en régressant $y_2$ sur $z_1, z_2, z_3$ (notez que l'estimateur $z_1$ sous-jacent au régresseur exogène $\beta_2$ est utilisé comme son propre instrument dans la matrice d'instrument $Z$). La forme réduite nécessite que les coefficients de $z_2, z_3$ soient non nuls pour que les variables instrumentales soient valides. Un test de restriction de Wald est alors appliqué pour la détection. Baum (2006) considère que si la statistique F dépasse 10, l'instrument est considéré comme fort. 
+
+(ii) l'estimation de l'équation sous forme réduite, on vérifie si les coefficients de $z_2, z_3$ sont non nuls; on utilise (ou non) l'estimateur $y_2$ en tant que variable instrumentale de $y_1$ sur $z_1$ et l'estimateur de $y_2$ (c'est-à-dire une VI).
+
+Il est important de noter que (i) l'estimateur MQ2E est moins efficace que la méthode MCO lorsque les variables explicatives sont, en fait, exogènes; (ii) les MCO et MQ2E fournissent des estimateurs cohérents si la condition d'exogénéité est satisfaite; (iii) un test d'endogénéité d'une variable explicative doit être effectué pour vérifier s'il est nécessaire d'utiliser MQ2E.
+
+Le test d'endogénéité Hausman est basé sur la comparaison des estimations OLS et MQ2E, afin de déterminer si les différences sont significativement différentes de zéro. La forme structurelle du modèle à estimer est la suivante :
+
+$$wage = \beta_0 +\beta_1 educ + \beta_2 exper + \beta_3 exper^2 + \mu,$$
+
+
+```{r}
+MROZ <- read_excel("~/Videos/Inverno 2019/Dados/MROZ.xlsx")
+
+head(MROZ)
+```
+
+```{r}
+dados = subset(MROZ, !is.na(MROZ$WAGE))
+
+n = nrow(dados)
+lwage = log(dados$WAGE)
+educ = dados$EDUC
+exper = dados$EXPER
+exper2 = (dados$EXPER)^2
+motheduc = dados$MOTHEDUC
+fatheduc = dados$FATHEDUC
+huseduc = dados$HUSEDUC
+
+reg1 = lm (lwage ~ educ + exper + exper2)
+```
+
+Nous prenons la variable éducation de la mère (Motheduc) comme instrument. Et nous vérifions s'il existe une corrélation entre la variable instrumentale (Motheduc) et éducation.
+
+```{r}
+reg.aux = lm (educ ~ motheduc)
+
+stargazer(reg1, reg.aux, type = "text", digits = 4, column.labels = c("", ""),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+Notez que la corrélation entre les variables est statistiquement différente (égale) à zéro. Ceci suggère que educ est une variable endogène. Ainsi, le modèle structurel est estimé en prenant en compte la variable instrumentale:
+
+
+```{r}
+reg.iv = ivreg(lwage ~ educ + exper + exper2 | motheduc + exper + exper2)
+
+stargazer(reg1, reg.aux, reg.iv, type = "text", digits = 4, column.labels = c("", "", ""),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+On remarque que la valeur de l’estimateur educ diminue (augmente) lorsque l’effet corrélé avec le motheduc est isolé. Nous considérons à présent un modèle avec plus d'une variable instrumentale (motheduc, fatheduc e huseduc). 
+
+```{r}
+reg2.aux = lm (educ ~ motheduc + fatheduc + huseduc + exper + exper2)
+```
+
+Pour évaluer si les instruments sont puissants, le test de restriction de Wald est utilisé:
+
+```{r}
+linearHypothesis(reg2.aux, c("motheduc = 0", "fatheduc = 0", "huseduc = 0"))
+```
+
+Par conséquent, les instruments peuvent être considérés comme forts (faibles), lorsque le résultat du test F soit supérieur (inférieur) à 10. Pour notre cas nous remarquons que les instruments sont forts. 
+
+```{r}
+reg2.iv = ivreg(lwage ~ educ + exper + exper2 | motheduc + fatheduc + huseduc + exper + exper2)
+
+stargazer(reg2.aux, reg.iv, reg2.iv, type = "text", digits = 4, 
+          column.labels = c("", "", "", ""),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+Notez que l'inclusion de plus de variables instrumentales pour expliquer la variable educ a rendu cette dernière statistiquement significative (non significative) par rapport au modèle avec une variable instrumentale. À présent nous vérifions l'homoscédasticité des erreurs. 
+
+```{r}
+bptest(reg2.iv)
+```
+
+Si la variance de l'erreur n'est pas constante (hétéroscédasticité), la statistique robuste est utilisée pour corriger le modèle:
+
+```{r}
+summary(reg2.iv, vcov. = sandwich)
+```
+
+Nous appliquons à présent le test de Hausman et Sargan pour vérifier s'il y a nécessité d'utiliser les instruments dans la régression. 
+
+```{r}
+summary(reg2.iv, vcov. = sandwich, diagnostics = TRUE)
+```
+
+Pour le test de *Wu-Hausman* l'hypothèse nulle $H_0$: MCO = MQ2E, la variable n'est pas endogène, et $H_1$: la variable est endogène en supposant que les VIs sont exogènes. Pour vérifier l'exogénéité des VIs, le test de *Sargan* est utilisé, où $H_0$: tous les VIs ne sont pas corrélés avec l'erreur (les instruments sont valides) et $H_1$ : le contraire. 
+
+L’endogénéité peut se définir, de façon assez large, comme étant la corrélation existante entre une  ou  plusieurs  variables  indépendantes  et  le terme  d’erreur  de la  régression. La complexité des décisions économiques  ajoutée  à  l’information limitée  dont  dispose le  chercheur  fait  que  la  quasi-totalité des  études peut  être  sujette  à  ce biais. 
+
+Après une  courte  description  dans  la première  partie  des  sources  potentielles  d’endogénéité  (les  variables  omises,  la simultanéité, les erreurs de mesure) et de leur impact sur l’estimation,  des  techniques  de traitement des  biais introduits à  l’aide de chocs exogènes ou  de  variables  instrumentales,  nous abordons dans la  deuxième  partie l’économétrie de données en panel, c’est-à-dire à des techniques qui reposent plus nettement sur des hypothèses  de  modélisation,  comme  la  méthode  des  effets  fixes  et  des  moments généralisés (voir Arellano  et  Bond, 1991).
+
+Baltagi (2008)  pense  que la  prise  en compte  de l’hétérogénéité  des individus  ou des firmes est fondamentale dans les études réalisées à l’aide de données de panel, ce que ne font pas la plupart  des  études en coupe  instantanée.    Par ailleurs, il  constate  que  les études en séries temporelles sont souvent affectées par des corrélations sérielles, ce qui est sans doute moins vrai pour les données de panel qui ajoutent de la variabilité  dans  l’échantillon traité. Enfin, il  assure  que cette économétrie  de panel est  précieuse pour construire  des  modèles explicatifs dynamiques.
+
+Par définition, on appelle *données de panel* des données qui comprennent plusieurs observations au cours du temps pour un même individu statistique (ou plusieurs individus). Nous démontrons, à l'aide d'un exemple, comment utiliser les *packages* de RStudio pour traiter ce problème. 
+
+## 4 Importation et analyse exploratoire des données
+
+
+```{r}
+dataPanel101 = read_csv("https://github.com/ds777/sample-datasets/blob/master/dataPanel101.csv?raw=true")
+
+dataPanel101 = plm.data(dataPanel101, index = c("country","year"))
+
+head(dataPanel101)
+```
+
+
+```{r}
+coplot(y ~ year|country, type = "b", data = dataPanel101)
+```
+
+Les barres en haut indiquent la position des pays de gauche à droite, en commençant par la ligne du bas. 
+
+```{r}
+scatterplot(y ~ year|country, data = dataPanel101)
+```
+
+### 4.1 Hétérogénéité entre pays
+
+```{r}
+plotmeans(y ~ country, data = dataPanel101)
+```
+
+La fonction *plotmeans* dessine un intervalle de confiance de 95% autour des moyennes.
+
+### 4.2 Hétérogénéité entre les années
+
+```{r}
+plotmeans(y ~ year, data = dataPanel101)
+```
+
+## 5 Modélisation de données en panel
+
+Les avantages de l'analyse des données de panel :
+
+i. *Différences entre individus et périodes*: les modèles de données de panel nous permettent d’utiliser des variables binaires pour contrôler les différences entre les unités transversales (individus) et les périodes. Les données transversales ne fournissent pas suffisamment de degrés de liberté pour une telle analyse;
+
+ii. *Degrés de liberté*: la taille d'échantillon d'une donnée de panel est le nombre d'unités transversales multiplié par le nombre de périodes. Dans les données transversales (séries chronologiques), nous n'avons que le nombre d'unités transversales (périodes);
+
+iii. *Contrôler le biais de variable omis*: nous pouvons contrôler les éléments non observables liés à la fois aux régresseurs et à la régression (biais de variable omis) à l'aide de variables binaires ou de la transformation *Within*.
+
+
+### 5.1 Modèle OLS de base
+
+Le modèle de régression en utilisant l'estimateur OLS ne prend pas en compte l'hétérogénéité entre pays ni entre années. 
+
+
+```{r}
+ols <- lm(y ~ x1, data = dataPanel101)
+
+stargazer(ols, type = "text", digits = 3, column.labels = c(""),
+          keep.stat = NULL, out = "panel.txt")
+```
+
+### 5.2 Graphique de Dispersion entre y et x_1
+
+```{r}
+yhat = ols$fitted
+
+ggplot(dataPanel101, aes(x = x1, y = y))+ geom_point() +
+  geom_smooth(method = lm)
+```
+
+### 5.3 Estimateur à effets fixes
+
+On fait maintenant l’hypothèse que les effets individuels $\beta_i$ sont représentés par des
+constantes (d’où l’appellation estimateur à effets fixes).
+
+i. Effets fixes spécifiques à un pays utilisant des variables binaires
+
+```{r}
+fixed.dum = lm(y ~ x1 + factor(country) - 1, data = dataPanel101)
+
+stargazer(fixed.dum, type = "text", digits = 3, column.labels = c(""),
+          keep.stat = NULL, out = "panel.txt")
+```
+
+Chaque composante de la variable facteur (pays) absorbe les effets spécifiques de chaque pays. La variable $x_1$ n'était pas significative dans le modèle MCO. Cependant, une fois que les différences entre pays ont été maîtrisées, $x_1$ est devenu significatif dans le modèle à effets fixes. 
+
+ii. Graphique des effets fixes spécifiques à un pays utilisant des variables binaires 
+
+```{r}
+yhat = fixed.dum$fitted
+
+scatterplot(yhat ~ dataPanel101$x1 | dataPanel101$country,  xlab ="x1", 
+            ylab ="yhat", boxplots = FALSE,smooth = FALSE)
+
+abline(lm(dataPanel101$y~dataPanel101$x1),lwd=3, col="red")
+```
+
+iii. Effets fixes spécifiques à chaque pays using the package plm (Estimateur Within ou LSDV)
+
+```{r}
+fixed.reg <- plm(y ~ x1, data = dataPanel101, model = "within")
+
+summary(fixed.reg)
+```
+
+Le coefficient de $x_1$ indique dans quelle mesure $y$ modifie les heures supplémentaires, en moyenne par pays, lorsque $x$ augmente de un. Nous affichons les effets fixes (constantes pour chaque pays):
+
+```{r}
+fixef(fixed.reg)
+```
+
+On peut aussi faire un test pour comparer les modèle à effets fixes et OLS. L'hypothèse nulle dans ce cas est annocncée comme : $H_0$ : le modèle OLS est meilleurs que effets fixes. 
+
+```{r}
+pFtest(fixed.reg, ols)
+```
+
+Si la valeur de p-value est inférieure à 0.05, le modèle à effets fixes sera un meilleur choix.
+
+### 5.4 Estimateur à effets aléatoires
+
+Dans la pratique standard de l’analyse économétrique, on suppose qu’il existe un grand
+nombre de facteurs qui peuvent affecter la valeur de la variable expliquée et qui pourtant ne sont pas introduits explicitement sous la forme de variables explicatives. Ces facteurs sont alors approximés par la structure des résidus. Le problème se pose de la façon similaire en économétrie de panel. La seule différence tient au fait que trois types de facteurs omis peuvent être envisagés. Il y a tout d’abord les facteurs qui affectent la variable endogène différemment suivant la période et l’individu considéré. Il peut en outre exister des facteurs qui affectent de façon identique l’ensemble des individus, mais dont l’influence dépend de la période considérée (effets temporel). Enfin, d’autres facteurs peuvent au contraire refléter des différences entre les individus de type structurelles, c’est-à-dire indépendantes du temps (effets individuel).
+
+```{r}
+random.reg = plm(y ~ x1, data = dataPanel101, model = "random")
+
+summary(random.reg)
+```
+
+L'interprétation des coefficients est compliquée car elle inclut les effets au sein de l'entité et entre les entités. Dans le cas des données TSCS (*time series and cross-section*), cela représente l’effet moyen de $X$ sur $Y$ lorsque $X$ change dans le temps et d’un pays à l’autre.
+
+Pour décider entre effets fixes et effets aléatoires, on peut exécuter un test de *Hausman* dans lequel l'hypothèse nulle affirme que le modèle le plus approprié est celui à effets aléatoires; l'alternative serait à effets fixes (voir Green, 2008, chapitre 9). Essentiellement, on teste si les erreurs sont corrélées avec les régresseurs, l'hypothèse nulle est qu'elles ne les sont pas. Si la valeur p est significative (< 0.05, par exemple), effets fixes sont utilisés, sinon on utilise à effets aléatoires.
+
+Le test de spécification d’Hausman (1978) est un test général qui peut être appliqué à
+des nombreux problèmes de spécification en économétrie. Mais son application la plus
+répandue est celle des tests de spécification des effets individuels en panel. Il sert ainsi
+à discriminer les effets fixes et aléatoires.
+
+```{r}
+phtest(fixed.reg, random.reg)
+```
+
+Dans ce cas, il faut utiliser le modèle à effets aléatoires.
+
+## 6 Diagnostic de régression
+
+### 6.1 Test à effets fixes dans le temps
+
+```{r}
+fixed.time = plm(y ~ x1 + factor(year), data = dataPanel101, model = "within")
+
+summary(fixed.time)
+```
+
+Le test à effets fixes dans le temps: L'hypothèse nulle est qu'aucun effet fixe n'est nécessaire dans le temps. 
+
+```{r}
+pFtest(fixed.time, fixed.reg)
+```
+
+Pour le test du Multiplicateur de Lagrange (Breusch-Pagan) l'hypothèse nulle est qu'aucun effet fixe n'est nécessaire dans le temps. 
+
+```{r}
+plmtest(fixed.reg, c("time"), type = "bp")
+```
+
+Si la valeur p est inférieure à 0.05, des effets fixes sont utilisés. Dans cet exemple, il n'est pas nécessaire d'utiliser des effets fixes au fil du temps.
+
+### 6.2 Effets aléatoires vs OLS groupés (empilés):
+
+Le test du Multiplicateur de Lagrange (LM) permet de choisir entre une régression à effets aléatoires et une régression simple par MCO.
+
+L'hypothèse nulle dans le test de LM est que les variations entre les entités sont nulles. C'est-à-dire sans différence significative entre les unités (c'est-à-dire sans effet de panel).
+
+```{r}
+pool = plm(y ~ x1, data = dataPanel101, model = "pooling")
+
+summary(pool)
+```
+
+Le test du Multiplicateur de Lagrange de Breusch-Pagan pour effets aléatoires est donnée pour : l'hypothèse nulle est qu'il n'y a pas d'effet de panel (c'est-à-dire une meilleure méthode MCO)
+
+```{r}
+plmtest(pool, type = c("bp"))
+```
+
+Ici, nous ne pouvons pas rejeter l’hypothèse nulle, nous concluons donc que l’estimateur à effets aléatoires n’est pas approprié. Autrement dit, il n’existe aucune preuve de différences significatives entre les pays. Par conséquent, il est possible d’effectuer une simple régression par la méthode de moindre carré ordinaire (MCO).
+
+### 6.3 Test de dépendance en coupe transversale
+
+Pour tester la dépendance en coupe transversale de chaque variable, il est fort récommandé d'utiliser le test d'indépendance de Breusch-Pagan (LM) et le test de Pesaran, 2004 (statistique CD).  L’hypothèse nulle $H_0$ est qu’il y a indépendance en coupe transversale. La statistique CD de Pesaran est basée sur la moyenne des coefficients de corrélation entre les différents pays pris deux-à-deux pour chaque période de temps. Sous l’hypothèse nulle, cette statistique est asymptotiquement distribuée selon une normale standard $N(0,1)$. Ce test peut être basé également sur les coefficients de corrélation des résidus obtenus par MCO (De Hoyos et Sarafidis, 2006).
+
+Selon Baltagi, la dépendance transversale est un problème dans les macro-panels à longue série chronologique. Ce n’est pas un gros problème dans les micro-panels (quelques années et un grand nombre de cas).
+
+```{r}
+fixed = plm(y ~ x1, data = dataPanel101, model = "within")
+
+pcdtest(fixed, test = c("lm"))  
+pcdtest(fixed, test = c("cd"))
+```
+
+Une fois que les tests montrent que $p-value > 0.05$, on conclut qu'il n'y a pas de dépendance transversale comme le cas pour notre exemple.
+
+### 6.4 Test de corrélation sérielle
+
+Les tests de corrélation sérielle s’appliquent aux données de macro-panels avec des séries chronologiques longues. Ils ne posent pas problème aussi dans les micro-panels (avec quelques années). L'hypothèse nulle $H_0$ dit qu'il n'y a pas corrélation sérielle. 
+
+```{r}
+pbgtest(fixed)
+```
+
+On remarque que la valeur statistique de $p$ est supérieure à 0.05, on conclut que l'hypothèse nulle ne peut pas être rejetée. 
+
+### 6.5 Tests de racine unitaire
+
+Rappelons que les tests de racine unitaire individuels sont reconnus pour leur faible puissance (Cochrane, 1991) spécialement dans le cas de petites valeurs de T. En général, les tests de racine unitaire utilisés ont comme hypothèse nulle $H_0$ que la variable testée possède une racine unitaire. La faible puissance du test signifie qu’on est souvent dans l’impossibilité de rejeter l’hypothèse nulle et on conclut incorrectement que la variable possède une racine unitaire. Les tests de racine unitaire de données panel présentent l’avantage d’être plus puissants et de remédier ainsi à ce problème (Baltagi et Kao, 2000 et Baltagi, 2013).
+
+```{r}
+adf.test(dataPanel101$y, k = 2)
+```
+
+Par la valeur statistique de $p$ qui est supérieure à 0.05, nous concluons que la série n'a pas de racine unitaire. En d'autres termes, la série est stationnaire. L'hypothèse nulle peut être alors rejetée. 
+
+### 6.6 Test d'hétéroscédasticité
+
+L'hypothèse nulle $H_0$ est que le modèle est homoscédastique. Nous observons la présence de l'hétéroscédasticité, il est possible de considérer la statistique robuste.  
+
+```{r}
+bptest(y ~ x1 + factor(country), data = dataPanel101, studentize = F)
+```
+
+Si l'hétéroscédasticité est détectée, il est nécessaire d'utiliser une matrice de covariance robuste (estimateur en sandwich) pour en rendre compte.
+
+#### 6.6.1 Contrôler l'hétéroscédasticité: effets aléatoires
+
+La fonction *vcovHC* combine trois estimateurs de covariance compatibles avec l'hétéroscédasticité:
+
+**White1**: pour l'hétéroscédasticité générale, mais pas de corrélation en série. Le test est recommandé pour les effets aléatoires.
+
+**White2**: white1 est limité à une variation commune au sein des groupes. Ici aussi, le test est plus recommandé pour les effets aléatoires.
+
+**Arellano**: L'hétéroscédasticité et la corrélation sérielle. Ce test est recommandé pour les effets fixes. Pour ainsi, les options suivantes s'appliquent:
+
+*HC0* - hétéroscédasticité cohérente. Il s'agit donc de la norme.
+
+*HC1, HC2, HC3* - sont recommandés pour les petits échantillons. Il est important de noter que *HC3* donne moins de poids aux observations influentes.
+
+*HC4* - sont recommandés pour les petits échantillons avec des observations d’affluents *HAC* - hétéroscédasticité et autocorrélation cohérente (type VcovHAC pour plus de détails). 
+
+```{r}
+coeftest(random.reg) # Coefficients originals 
+coeftest(random.reg, vcovHC) # Coefficients consistents-heteroscedasticite
+coeftest(random.reg, vcovHC(random.reg, type = "HC3")) # Coefficients consistents: 
+                                                       # heteroscedasticite, type 3
+
+t(sapply(c("HC0", "HC1", "HC2", "HC3", "HC4"), 
+         function(x) sqrt(diag(vcovHC(random.reg, type = x))))) 
+# Affiche les erreurs HC standard des coefficients
+```
+
+#### 6.6.2 Contrôler l'hétéroscédasticité: effets fixes
+
+```{r}
+coeftest(fixed) 
+coeftest(fixed, vcovHC(fixed, method = "arellano"))  
+coeftest(fixed, vcovHC(fixed, type = "HC3")) 
+
+t(sapply(c("HC0", "HC1", "HC2", "HC3", "HC4"), 
+         function(x) sqrt(diag(vcovHC(fixed, type = x)))))
+```
+
+# Textes sources 
+
+Arellano, M., and Bond, S. Some Tests of Specification for Panel Data : Monte Carlo Evidence and an Application to Employment Equations. *The Review of Economic Studies* 58, 2 (1991), 277-297.
+
+Baltagi, B. Econometric Analysis of Panel Data. *John Wiley & Sons*, 2013.
+
+Baltagi, B., and Kao, C. Nonstationary Panels, Cointegration in Panels and Dynamic
+Panels : A Survey. *Syracuse University Center for Policy Research Working Paper*, 16 (2000).
+
+Baum, C.F., Schaffer, M.E.; Stillman, S. Instrumental variables and GMM: Estimation and Testing. *Boston College*. Working Paper No. 545, 2003.
+
+Baum, C.F. Residual Diagnostics for Cross-Section Time Series Regression Models. *The Stata Journal* 1, 1 (2001), 101-104.
+
+Blundell, R., and Bond, S. Initial Conditions and Moment Restrictions in Dynamic Panel
+Data Models. *Journal of Econometrics* 87, 1 (1998), 115-143.
+
+Bond, S., Leblebicioglu, A., and Schiantarelli, F. Capital Accumulation and Growth : a New Look at the Empirical Evidence. *Journal of Applied Econometrics* 25, 7 (2010), 1073-1099.
+
+Cameron, C. and Trivedi, P. Microeconometrics: Methods and Applications. *Stata Coorp*, LP, 2010.
+
+Cochrane, J. H. A Critique of the Application of Unit Root Tests. *Journal of Economic Dynamics and Control* 15, 2 (1991), 275-284.
+
+Greene, W. H. Econometric Analysis, 7th ed. *Prentice Hall*, 2012.
+
+Hamilton, J. D. Time Series Analysis. *Princeton University Press*, Princeton, 1994.
+
+Im, K.S., Pesaran, M. H., and Shin, Y. Testing for Unit Roots in Heterogeneous Panels.
+*Journal of Econometrics* 115, 1 (2003), 53-74.
+
+Pesaran, M. H. General Diagnostic Tests for Cross Section Dependence in Panels. CESifo
+Working Paper no. 1229, *CESifo Group Munich*, 2004.
+
+Pesaran, M. H. Estimation and Inference in Large Heterogeneous Panels with a Multifactor
+Error Structure. *Econometrica* 74, 4 (2006), 967-1012.
+
+Pesaran, M.H. A Simple Panel Unit Root Test in the Presence of Cross-Section Dependence. *Journal of Applied Econometrics* 22, 2 (2007), 265-312.
+
+Pesaran, M. H., and Smith, R. Estimating Long-Run Relationships from Dynamic Heterogeneous Panels. *Journal of Econometrics* 68, 1 (1995), 79-113.
+
+Wooldridge, J.M. Econometric Analysis of Cross Section and Panel Data, 2nd ed. *The MIT Press*, 2010.
+
+Wooldridge, J.M. Introductory Econometrics: a Modern Approach. *Stata Press College Station*, USA, (2006). 
+
+
+
+
+
+
+
+
+

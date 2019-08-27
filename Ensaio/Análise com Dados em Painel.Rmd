@@ -1,0 +1,249 @@
+---
+title: "Análise com Dados em Painel"
+author: "João Paulo F. Fenelon"
+date: "7 de julho de 2019"
+output: html_document
+---
+
+#1 Carregam-se os seguintes pacotes:
+
+```{r}
+library(tidyverse) # Modern data science library 
+library(plm)       # Panel data analysis library
+library(car)       # Companion to applied regression 
+library(gplots)    # Various programing tools for plotting data
+library(tseries)   # For timeseries analysis
+library(lmtest)    # For hetoroskedasticity analysis
+```
+
+
+#2 Importação dos dados:
+
+```{r}
+dataPanel101 <- read_csv("https://github.com/ds777/sample-datasets/blob/master/dataPanel101.csv?raw=true")
+```
+
+Indicar a base de dados como dados em painel:
+
+```{r}
+dataPanel101 <- plm.data(dataPanel101, index=c("country","year"))
+View(dataPanel101)
+```
+
+#3 Análise exploratória dos dados:
+
+```{r}
+coplot(y ~ year|country, type="b", data=dataPanel101)
+```
+
+As barras na parte superior indicam a posição dos países da esquerda para a direita, começando na linha de baixo
+
+```{r}
+scatterplot(y~year|country, data=dataPanel101)
+```
+
+##3.1 Heterogeneidade entre os países
+
+```{r}
+plotmeans(y ~ country, data = dataPanel101)
+```
+plotmeans desenha um intervalo de confiança de 95% em torno das médias.
+
+##3.2. Heterogeneidade entre os anos
+
+```{r}
+plotmeans(y ~ year, data = dataPanel101)
+```
+
+#4 Modelando dados em painel
+
+##4.1 Modelo OLS básico
+
+O modelo básico de regressão OLS não considera a heterogeneidade entre países ou entre anos
+
+```{r}
+ols <-lm(y ~ x1, data = dataPanel101)
+summary(ols)
+```
+
+```{r}
+yhat <- ols$fitted
+ggplot(dataPanel101, aes(x = x1, y = y))+
+  geom_point() +
+  geom_smooth(method=lm)
+```
+
+##4.2 Estimador de Efeitos Fixos
+
+###4.2.1 Efeitos fixos específicos de cada país usando variáveis binárias (modelo LSDV)
+
+```{r}
+fixed.dum <-lm(y ~ x1 + factor(country) - 1, data = dataPanel101)
+summary(fixed.dum)
+```
+
+```{r}
+yhat <- fixed.dum$fitted
+scatterplot(yhat ~ dataPanel101$x1 | dataPanel101$country,  xlab ="x1", ylab ="yhat", boxplots = FALSE,smooth = FALSE)
+abline(lm(dataPanel101$y~dataPanel101$x1),lwd=3, col="red")
+```
+
+####4.2.1.1 OLS vs LSDV
+
+Cada componente da variável fator (país) está absorvendo os efeitos específicos de cada país. A variável x1 não foi significativa no modelo OLS. No entanto, uma vez controlada as diferenças entre países, x1 tornou-se significativa no OLS_DUM (ou seja, modelo LSDV)
+
+###4.2.2 Efeitos fixos específicos de país usando o pacote plm
+
+```{r}
+fixed <- plm(y ~ x1, data=dataPanel101, model="within")
+summary(fixed)
+```
+
+O coeficiente de x1 indica quanto Y muda a hora extra, em média por país, quando X aumenta em uma unidade.
+
+Exibir os efeitos fixos (constantes para cada país):
+
+```{r}
+fixef(fixed)
+```
+
+Teste para efeitos fixos:
+
+```{r}
+pFtest(fixed, ols)  #h0: OLS é melhor que fixed
+```
+
+Se o valor p for <0,05, o modelo de efeitos fixos será uma escolha melhor.
+
+##4.3 Estimador de efeitos aleatórios
+
+```{r}
+random <- plm(y ~ x1, data=dataPanel101, model="random")
+summary(random)
+```
+
+A interpretação dos coeficientes é complicada, pois inclui os efeitos dentro da entidade e entre entidades. No caso dos dados TSCS (i.e., time series e cross-section), representa o efeito médio de X sobre Y quando X muda ao longo do tempo e entre países por uma unidade.
+
+##4.4 Fixos vs Aleatórios
+
+Para decidir entre efeitos fixos ou aleatórios pode-se executar um teste de Hausman em que a hipótese nula afirma que o modelo mais adequado é o de efeitos aleatórios; a alternativa seria dos efeitos fixos (ver Green, 2008, capítulo 9). Basicamente testa se os erros são correlacionados com os regressores, a hipótese nula é que eles não são. Se o valor p for significativo (por exemplo, <0,05), usa-se efeitos fixos, caso contrário usar efeitos aleatórios.
+
+```{r}
+phtest(fixed, random)
+```
+neste caso, deve-se usar o modelo de efeitos aleatórios.
+
+##4.5 Diagnóstico de regressão
+
+###4.5.1 Teste de efeitos fixos no tempo
+
+```{r}
+fixed.time <- plm(y ~ x1 + factor(year), data=dataPanel101, model="within")
+summary(fixed.time)
+```
+
+Testando efeitos fixos no tempo:
+
+```{r}
+pFtest(fixed.time, fixed)  #A nula é que não são necessários efeitos fixos no tempo
+
+plmtest(fixed, c("time"), type=("bp"))  #A nula é que não são necessários efeitos fixos no tempo
+```
+
+Se o valor p <0,05, usa0se efeitos fixos no tempo. Neste exemplo, não há necessidade de usar efeitos fixos no tempo.
+
+###4.5.2 Efeitos aleatórios vs OLS agrupados (empilhados):
+
+O teste LM ajuda a decidir entre uma regressão de efeitos aleatórios e uma regressão OLS simples.
+
+A hipótese nula no teste LM é que as variações entre as entidades são zero. Isto é, sem diferença significativa entre as unidades (ou seja, sem efeito de painel).
+
+```{r}
+pool <- plm(y ~ x1, data=dataPanel101, model="pooling")
+summary(pool)
+```
+
+Multiplicador de Lagrange de Breusch-Pagan para efeitos aleatórios:
+
+```{r}
+plmtest(pool, type=c("bp"))  #h0: não há efeito de painel (ou seja, melhor OLS)
+```
+
+Aqui, não se conseguiu rejeitar a nula, de modo que se conclui que o estimador de efeitos aleatórios não são apropriados. Isto é, não há nenhuma evidência de diferenças significativas entre os países, portanto, pode-se executar uma regressão OLS simples.
+
+###4.5.3 Teste de dependência transversal
+
+Correlação simultânea de teste usando o teste de independência de Breusch-Pagan LM e teste de CD de Pasaran
+
+Segundo Baltagi, a dependência transversal é um problema em macro-painéis com séries temporais longas. Este não é um grande problema em micro painéis (poucos anos e grande número de casos).
+
+A hipótese nula nos testes de independência B-P / LM e Pasaran CD é que os resíduos entre as entidades não são correlacionados. Os testes B-P / LM e Pasaran CD (dependência de seção transversal) são usados para testar se os resíduos estão correlacionados entre as entidades. Dependência transversal pode levar a viés nos resultados dos testes (também chamado de correlação contemporânea).
+
+```{r}
+fixed <- plm(y~x1, data=dataPanel101, model="within")
+pcdtest(fixed, test = c("lm"))  #h0: não há dependência transversal
+pcdtest(fixed, test = c("cd"))
+```
+
+Uma vez que os testes apontam p> 0,05, conclui-se que não há dependência transversal.
+
+###4.5.4 Teste de correlação serial
+
+Os testes de correlação serial aplicam-se a painéis macro com séries temporais longas. Não é um problema em micro painéis (com poucos anos).
+
+```{r}
+pbgtest(fixed)  #h0: não há correlação serial
+```
+
+Pelo valor de p> 0,05, conclui-se que não há correlação serial.
+
+###4.5.5 Testes de raízes unitárias/estacionariedade
+
+O teste Dickey-Fuller para verificar tendências estocásticas.
+
+Se uma raiz unitária estiver presente, deve-se tirar a primeira diferença da variável.
+
+```{r}
+adf.test(dataPanel101$y, k=2)  #h0: a série tem uma raiz unitária (i.e., não estacionária)
+```
+
+Pelo valor de p <0,05, conclui-se que a série NÃO possui raiz unitária. Em outras palavras, a série é estacionária.
+
+###4.5.6 Teste de Heterocedasticidade
+
+```{r}
+bptest(y ~ x1 + factor(country), data = dataPanel101, studentize=F)  #h0: o modelo é homocedástico
+```
+Como o valor de p <0,05, detecta-se heteroscedasticidade
+
+Se a heterocedasticidade for detectada, precisa-se usar uma matriz de covariância robusta (estimador sandwich) para contabilizá-la.
+
+####4.5.6.1 Controlando a heteroscedasticidade: efeitos aleatórios
+
+A função -vcovHC- estima três estimadores de covariância consistentes com heterocedasticidade:
+
+*white1 "- para heteroscedasticidade geral, mas sem correlação serial. Recomendado para efeitos aleatórios.
+*white2 "- é" white1 "restrito a uma variação comum dentro de grupos. Recomendado para efeitos aleatórios.
+*arellano "- heteroscedasticidade e correlação serial. Recomendado para efeitos fixos.
+
+As seguintes opções se aplicam:
+
+*HC0 - heteroscedasticidade consistente. O padrão.
+*HC1, HC2, HC3 - Recomendado para amostras pequenas. O HC3 dá menos peso a observações influentes.
+*HC4 - amostras pequenas com observações influentes HAC - heterocedasticidade e autocorrelação consistente (tipo? VcovHAC para mais detalhes)
+
+```{r}
+coeftest(random) #coeficientes originais
+coeftest(random, vcovHC) #Coeficientes consistentes à heterocedasticidade
+coeftest(random, vcovHC(random, type = "HC3")) #Coeficientes consistentes à heterocedasticidade, tipo 3
+t(sapply(c("HC0", "HC1", "HC2", "HC3", "HC4"), function(x) sqrt(diag(vcovHC(random, type = x))))) #Apresenta os erros padrão HC dos coeficientes
+```
+
+####4.5.6.2 Controlando a heteroscedasticidade: efeitos fixos
+
+```{r}
+coeftest(fixed) #coeficientes originais
+coeftest(fixed, vcovHC(fixed, method = "arellano"))  #Coeficientes consistentes à heterocedasticidade (Arellano)
+coeftest(fixed, vcovHC(fixed, type = "HC3")) #Coeficientes consistentes à heterocedasticidade, tipo 3
+t(sapply(c("HC0", "HC1", "HC2", "HC3", "HC4"), function(x) sqrt(diag(vcovHC(fixed, type = x))))) #Apresenta os erros padrão HC dos coeficientes
+```

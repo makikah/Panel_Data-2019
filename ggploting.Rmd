@@ -1,0 +1,156 @@
+---
+title: "Data Analysis whith R"
+author: "Henri Makika"
+date: "7/27/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      fig.width = 8, fig.height = 6)
+```
+
+## Exemples plotting
+
+
+```{r}
+x = rnorm (100)
+y = rnorm (100)
+plot(x, y, col = "green")
+plot(x, y, xlab = "this is the x-axis " , ylab = "this is the y-axis" ,
+      main = "Plot of X vs Y")
+```
+
+## Loading Data
+
+```{r}
+library(ggplot2) # Pour le graphique
+library(knitr) # Para Kable
+library(dplyr) # Pipe operator
+
+data(diamonds)
+summary(diamonds[,1:5]) %>% kable(digits = 0)
+```
+
+```{r}
+data(diamonds)
+summary(diamonds[,6:10]) %>% kable(digits = 0)
+```
+
+```{r}
+qplot(carat, price, data = diamonds)
+```
+
+```{r}
+qplot(log(carat), log(price), data = diamonds)
+```
+
+
+```{r}
+qplot(carat, x * y * z, data = diamonds)
+```
+
+## Colour, size, shape and other aesthetic attributes
+
+```{r}
+par(mfrow = c(2,1))
+
+qplot(carat, price, data = diamonds, colour = color)
+qplot(carat, price, data = diamonds, shape = cut)
+```
+
+```{r}
+qplot(carat, price, data = diamonds, alpha = I(1/10))
+qplot(carat, price, data = diamonds, alpha = I(1/100))
+qplot(carat, price, data = diamonds, alpha = I(1/200))
+```
+
+## Plot geoms
+
+```{r}
+# Adding a smoother to a plot
+
+qplot(carat, cut, data = diamonds, geom = c("point", "smooth"))
+qplot(carat, price, data = diamonds, geom = c("point", "smooth"))
+```
+
+```{r}
+set.seed(1234)  # Fixed seed
+dsmall <- diamonds[sample(nrow(diamonds), 200), ]
+
+qplot(log(carat), log(price), data = diamonds)  # Scatter Plot
+qplot(log(carat), log(price), data = diamonds, colour = color)
+```
+
+## Jitter Plot
+
+```{r}
+qplot(color, price/carat, data = diamonds, geom = "jitter", alpha = I(0.25))  # Standard Jitter plot
+qplot(color, price/carat, data = diamonds, geom = "jitter", alpha = I(0.25), 
+      colour = color)
+```
+
+## Boxplot
+
+```{r}
+qplot(color, price/carat, data = diamonds, geom = "boxplot")  # Boxplot
+qplot(color, price/carat, data = diamonds, geom = "boxplot", colour = color)
+```
+
+## Histogram
+
+```{r}
+qplot(carat, data = diamonds, geom = "histogram", binwidth = 1)  
+qplot(carat, data = diamonds, geom = "histogram", binwidth = 0.1)  
+qplot(carat, data = diamonds, geom = "histogram", binwidth = 0.01)  
+qplot(carat, data = diamonds, geom = "histogram", binwidth = 1, fill = color)  
+qplot(carat, data = diamonds, geom = "histogram", binwidth = 0.1, fill = color)  
+qplot(carat, data = diamonds, geom = "histogram", binwidth = 0.01, fill = color)
+```
+
+## Density plot
+
+```{r}
+qplot(carat, data = diamonds, geom = "density")  
+qplot(carat, data = diamonds, geom = "density", colour = color, 
+      fill = color, alpha = I(0.5))  
+qplot(carat, data = diamonds, geom = "density", colour = color, 
+      fill = color, alpha = I(0.25)) 
+```
+
+## Time Series with “path”
+
+```{r}
+year = function(x) as.POSIXlt(x)$year + 1900
+qplot(unemploy/pop, uempmed, data = economics, geom = c("point", "path"))  
+qplot(unemploy/pop, uempmed, data = economics, geom = "path", colour = year(date)) +
+  scale_size_area()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

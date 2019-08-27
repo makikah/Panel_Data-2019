@@ -1,0 +1,1007 @@
+---
+title: "Revisão de Econometria"
+author: "João Paulo F. Fenelon"
+date: "12 de novembro de 2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+AULA 2 - AJUSTE DO MODELO DE REGRESSÃO SIMPLES
+
+Modelo de regressão (lm); análise dos resultados (summary); correlação entre x e y (cor(dados$y, dados$x)); dispersão no gráfico (plot(dados$y, dados$x)).
+
+AULA 3 - REGRESSÃO MÚLTIPLA
+
+Modelo de regressão múltipla; modelos com termo quadrático (I(x1^2)); análise de variância (anova(modelo)); análise do viés do estimador (vies=y*modelo$coef[n]).
+
+AULA 4 - TÓPICOS ADICIONAIS - REGRESSÃO MÚLTIPLA (PARTE 1)
+
+1) Juntar os dados (gerar uma tabela comparativa entre, por exemplo, os modelos linear, log-linear e log-log):
+
+library(stargazer)
+stargazer (linear, loglinear, loglog, type = 'text', digits = 8, column.labels=c('Linear','loglinear', 'loglog'), keep.stat=c('n','rsq','adj.rsq','f'),out='saida.txt')
+
+2) Testes de normalidade:
+
+res=modelo$residuals    #toma-se os resíduos após calculado um modelo qualquer de regressão
+hist(res,fre=F)   #elabora-se um histograma da variável desejada
+par(new=TRUE)   ##par pode ser usado para definir ou consultar parâmetros 
+plot(density(res),main='',xlab='',ylab='')    #adiciona ao gráfico a função densidade à frequência observada
+
+a) Teste de Jarque-Bera (JB)
+
+library(normtest)   #pacote necessário para realizar os testes de normalidade
+jb.norm.test(res)   #teste assintótico. H0: os erros são normalmente distribuídos assintoticamente. Seu cálculo depende das medidas de assimetria e curtose.
+
+b) Teste de Shapiro-Wilk (W)
+
+shapiro.test(res)   #teste para qualquer tamanho amostral. H0: a amostra provém de uma população normal. Seu cálculo depende da média e variância.
+
+AULA 5 - TÓPICOS ADICIONAIS - REGRESSÃO MÚLTIPLA (PARTE 2)
+
+pairs(dados[,2:4], panel=panel.smooth)    #gráfico de dispersão de todas as variáveis
+confint(modelo, conf.level=0.95)    #intervalo de confiança
+
+1) Valores estimados de Y em modelos lin-lin, log-lin e log-log:
+
+est_y=modelo$fitted.values   #fornece os valores previstos da variável y em sua unidade especificada no modelo.
+plot(est_y, res)
+
+Contudo, para modelos log-lin e log-log, pode-se estar interessado em verificar os valores estimados de y em termos de nível (Y^=alpha0(lnY^)). Nesse caso, precisa-se calcular o valor de alpha (fator de correlação). Há dois métodos para esse cálculo:
+
+i) Método MQO:
+
+m=exp(est_y)
+alpha1=((sum(m*dados$y))/sum(m^2))
+hat_y1=alpha1*exp(est_y)
+
+ii) Método dos momentos   #Usa-se quando os resíduos não são normalmente distribuídos (Por quê?)
+
+alpha0=sum(exp(res)/length(res))
+hat_y= alpha0*exp(est_co2)
+
+iii*) Método convencional (viesado):
+
+hat_y2=exp(est_co2)
+
+Comparando os "três" métodos:   #Note que o "método iii*)" é viesado, uma vez que elimina o fator de correlação (alpha0).
+
+prev=cbind(hat_y,hat_y1,hat_y2)
+view(prev)
+
+2) Testes de restrição
+
+2.1) Análise de modelos nested (i.e., quando, dentre dois modelos, um deles contém um subconjunto de regressores do outro).
+
+
+i) Teste de Wald   #teste usado para verificar se um conjunto de q regressores contribui para explicar a variável dependente (i.e., verifica-se a significância estatística de variáveis explicativas de um modelo IRRESTRITO).
+
+library(car)
+x12=dados$x1^2
+unrestr=lm(log(y)~x1+x12+x2,data=dados)
+summary(unrestr)
+
+linearHypothesis(unrestr,c("x1=0","x12=0"),test="F")
+linearHypothesis(unrestr,c("x1=0","x12=0"),test="Chisq")    #H0: x1 = x12 = 0
+
+ii) Teste multiplicador de Lagrange (LM)    #(1) usado para grandes amostras; (2) verifica-se a significância estatística de um modelo RESTRITO
+
+Passo a passo:
+a)
+modelo = lm (y ~ x1 + x12, data = dados)
+res=modelo$residuals
+b)
+modelob = lm (res ~ x1 + x12, data = dados)
+summary = modelob
+c)
+LM = length(res)*summary(modelob)$r.squared
+d)
+Compara-se o valor obtido no teste LM (etapa c)) com o p-valor do summary (etapa b)). Se o valor-p for estatisticamente BAIXO, rejeita-se a hipótese nula; logo, as variáveis x1 e x12 acrescentam informações relevantes ao modelo. Portanto, h0: x1 = x12 = 0.
+
+2.2) Análise de modelos non-nested (i.e., modelos onde, embora busquem explicar o comportamento de uma mesma variável dependente, têm variáveis explicativas disjuntas)
+
+i) Coeficiente de determinação ajustado   #Observação: seu uso para fins comparativos deve ser evitado quando a forma funcional da variável dependente difere entre os modelos analisados
+
+modelo1=lm(log(y)~log(x1), data=dados)
+summary(modelo1)
+modelo2=lm(log(y)~x1+x12, data=dados)
+summary(modelo2)
+
+ii) Critério de informação Akaike (AIC)    #supõe-se uma distribuição normal para os resíduos.
+
+AIC(modelo1, modelo2)   #Escolhe-se o modelo com menor AIC (i.e., aquele que apresenta menor variabilidade dos resíduos)
+
+AULA 6 - MULTICOLINEARIDADE
+
+1) Verificação:
+
+(i) Fator inflacionário da variância
+
+library(car)
+vif(modelo)   #se for maior que 4, verifique se o teste de hipótese continua válido (pois a correlação entre os regressores é igual ou maior que 0,75)
+
+(ii) Correlação linear significativa entre os regressores
+
+cor(modelo$x1,modelo$x2)
+
+(iii) Conflito entre as estatísticas R^2 e F do modelo e testes t para os parâmetros Betas
+
+summary(modelo)
+
+2) Correção:
+
+(i) Aumentar n
+
+(ii) Transformação de variáveis
+
+Seja o modelo:
+
+modelo = lm (log(y) ~ log (x1) + log (x2), data = dados)
+summary(modelo)
+
+verifica-se a presença de multicolinearidade
+
+library(car)
+vif(modelo)
+
+supondo que haja multicolinearidade, pode-se optar pela transformação de variáveis,
+
+modelo2 = lm (log(y/x2) ~ log (x1/x2), data = dados)    #A transformação de variáveis precisa ser razoável teoricamente (e.g. PIB/população = PIB per capita)
+summary(modelo2)
+
+(iii) Omitir (eliminar) regressor que apresentar alta colinearidade   #Observação: note que esta solução pode gerar viés de especificação no modelo
+
+AULA 7 - PROBLEMAS DE ESPECIFICAÇÃO
+
+Sabe-se, por hipótese, que E(ui|Xi)=0. O valor de Xi é fixo. Se cor(u,X) é diferente de 0, então X é uma variável endógena. Isso pode ser causado pela omissão de uma variável explicativa. Quando isso ocorre, tem-se má especificação da forma funcional. Isso gera viés e inconsistencia em estimadores MQO.
+
+Causas dos problemas de especificação: (i) omissão de variáveis explicativas; (ii) forma funcional incorreta.
+
+1)Testes de especificação:
+
+(i) Teste t   #verifica se a variável explanatória é ou não relevante no modelo.
+
+(ii) Testes F e LM    #aplica-se testes de restrição
+
+seja um modelo linear
+modelo = lm (Y ~ X1 + X2 + X3, data = dados)
+
+adicionando termos quadráticos o modelo se torna:
+modelo2 = lm (Y ~ X1 + X2 + X3 + I(x1^2) + I(x2^2), data = hprice)
+summary(reg2)
+
+verifica-se a significância estatística da inclusão das variáveis não-lineares (teste de Wald)
+linearHypothesis(modelo2,c('I(x1^2)=0', 'I(x2^2)=0'), test = 'F')
+
+tabela de resultados
+
+library(stargazer)
+stargazer(modelo, modelo2, digits = 8, type = 'text',
+          column.labels = c('Linear', 'Quadrático'),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+
+(iii) Teste Reset   #Teste geral de especificação. Testa, sob uma distribuição F, se as combinações não lineares dos regressores ajudam a explicar a variável dependente. H0: E(u|xi)=0 (i.e., o modelo está bem especificado ou as combinações não lineares são estatisticamente iguais a zero).
+
+library(lmtest)
+resettest(modelo_linear)
+
+Assim, se h0 é rejeitado, deve-se decidir quais variáveis independentes não lineares devem ser incluídas no modelo linear. Sugere-se a inclusão de variáveis quadráticas ou cúbicas.
+
+(iv) Teste de Davidson-MacKinnon    #aplicado para modelos non-nested. Verifica se uma variável independente deve estar em nível ou na forma logarítmica. Parte-se de um modelo linear.
+
+seja o modelo linear:
+
+modelo1 = lm (Y ~ X1 + X2, data = dados)
+summary(modelo1)
+
+contra o modelo
+
+modelo2 = lm (Y ~ log(X1) + log(X2), data = dados)
+summary(modelo2)
+
+testa-se no modelo3 a significância estatística (teste t) da variável "fitted(modelo2)" (i.e., verifica-se se os valores estimados do modelo2 são significantes no modelo1):
+
+modelo3 = lm (Y ~ X1 + X2 + I(fitted(modelo2)), data = dados)
+summary(modelo3)    #Se a estatística t para I(fitted(modelo2)) é insignificante, então o modelo1 é o mais adequado; Se a estatística t para I(fitted(modelo2)) é significante, então o modelo1 é inadequado (rejeitado).
+
+Comparando os modelos 1 e 2:
+
+stargazer(modelo1, modelo2, digits = 8, type = 'text',
+          column.labels = c('Linear', 'Log'),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+          
+2) Critérios para seleção de modelos
+
+(i) R²   #Nota-se que só é possível fazer comparações quando se tem (i) uma mesma variável dependente (bem como uma mesma forma funcional) e (ii) quando o número de variáveis independentes são iguais.
+
+(ii) R^2 ajustado   #Nota-se que só é possível fazer comparações quando se tem (i) uma mesma variável dependente (bem como uma mesma forma funcional).
+
+(iii) Critério de informação Akaike (AIC)   #Compara dois ou mais modelos.
+
+AIC(modelo1, modelo2)   #escolha o modelo com menor valor de AIC
+
+(iv) Critério de informação de Schwarz (BIC)    #compara dois ou mais modelos.
+
+BIC(modelo1, modelo2)   #escolha o modelo com menor valor de BIC
+
+AULA 8 - VARIÁVEIS BINÁRIAS
+
+Categorias de variáveis: escala nominal, escala ordinal, escala intervalar, escala de razão.
+
+Definição da variável dummy: estados possíveis: D = 0 (ausência da característica de interesse) e D = 1 (presença da característica de interesse).
+
+Seja o modelo: modelo = lm (Y ~ x1 + D, data = dados). O coeficiente (Beta)2 (associado a variável dummy = D) indica quanto Y é, em média, maior (ou menor) para a categoria A (D=1) que a categoria de referência B (D=0), indenpendente do valor de X.
+
+1) Especificação de uma binária com uma categoria:
+
+Para a representação de duas categorias nominais (e.g. alta e baixa) em um modelo de regressão, precisa-se de apenas uma variável binária D. Por quê? Porque seria redundante ter duas. Além disso, introduziria colinearidade perfeita entre as variáveis binárias; este é um exemplo simples da chamada armadilha da variável dummy.
+
+(i) extrai-se do conjunto de dados a variável explicativa-alvo para ser especificada como binária:
+
+pib=Dados_CO2$pib
+n = length(pib)
+
+(ii) nomeia-se o nome da variável (e.g. "alta"):
+
+alta=rep(0,n)
+View(alta)
+
+(iii) programa-se o que se deseja especificar com a variável binária usando a função "for":
+
+for(i in 1:n){if(pib[i]>=12000)alta[i]=1}    #i.e., se pib[i] é igual ou maior que 1200, então recebe o atributo "alta = 1", caso contrário "alta=0".
+
+Nota**: pode-se usar alternativamente a função "as.numeric(condição)" no lugar de "for"
+
+Para o caso do arquivo "Dados_PIB.xlsx", tem-se a variável sigla dos países. Exemplo: d1=binária se Alemanha, d2 se Canadá etc.
+
+sigla=Dados_CO2$sigla
+
+d1=as.numeric(sigla=='DEU') #coloca-se duas vezes o sinal == pois está se comparando caracteres
+d2=as.numeric(sigla=='CAN')
+d3=as.numeric(sigla=='USA')
+d4=as.numeric(sigla=='ITA')
+d5=as.numeric(sigla=='FRA')
+d6=as.numeric(sigla=='JPN')
+d7=as.numeric(sigla=='GBR')
+
+binaria_G7=d1+d2+d3+d4+d5+d6+d7
+
+(iv) adiciona-se à coluna "dados" em "Dados_CO2":
+
+dados = cbind(pib,alta)   #cbind combina objetos por linhas ou colunas. Neste caso, a combinação entre pib e alta.
+View(dados)
+
+(v) Finalmente, o modelo é dado como:
+
+modelo1 = lm (co2 ~ alta + setor2, data = Dados_CO2)    #O coeficiente de uma variável dummy pode ser interpretado como a DIFERENÇA na emissão de CO2 entre países de renda "alta" e os de renda "baixa", respectivamente, mantido as demais variáveis explanatórias (neste caso, o setor2) constantes.
+summary(modelo1)    #Assim, para países com pib >= a 12.000, o valor médio de CO2 emitido é em média x unidades maior (menor) que os demais países (ou aqueles com pib inferior a 12.000), ceteris paribus. A interpretação do coeficiente do setor2 permanece a mesma.
+
+2) Binárias com k categorias.
+
+A representação de k categorias nominais exige k-1 variáveis binárias D, uma vez que a referência (base) será dada por uma das categorias.
+
+Seguindo a mesma lógica anterior:
+
+media=rep(0,n)
+for(i in 1:n){if(pib[i]>=4000 & (pib[i]<12000))media[i]=1}
+dados2=cbind(pib,media)
+View(dados2)
+
+modelo2 = lm (co2 ~ media + alta + setor2, data = Dados_CO2)
+summary(modelo2)    #países de renda alta emitem, em média, x unidades a mais (menos) que os países de renda baixa, ceteris paribus. Os países de renda média emitem, em média, x unidades a mais (menos) que os países de renda baixa, ceteris paribus.
+
+Nota-se que, partindo de um modelo linear estatisticamente significativo, a tranformação do modelo em grupos de variáveis binárias pode afetar a significância do modelo. Por quê? Porque se altera a especificação do modelo.
+
+3) Binárias em funções logarítmicas
+
+(i) Seja o modelo log-linear com uma categoria binária
+
+modelo3 = lm (log(co2) ~ alta + setor2, data = Dados_CO2)
+summary(modelo3)
+
+O valor preciso do coeficiente de uma variável em um modelo log pode ser calculado como
+
+binária=exp(modelo3$coefficients[2])-1    #Logo, emissões dos países de renda alta são, em média, quase x (ou quase x(100%) maior) vezes maior que os demais países (resto do mundo).
+
+(ii) Seja o modelo log-linear com k categorias
+
+modelo4 = lm (log(co2) ~ alta + media + setor2, data = Dados_CO2)
+summary(modelo4)
+
+Da mesma forma que no caso anterior, para calcular o valor preciso do coeficiente de uma variável dummy, faz-se
+
+binaria_alta=exp(modelo4$coefficients[2])-1
+binaria_media=exp(modelo4$coefficients[3])-1    #As emissões per capita de CO2 dos países de renda alta são, em média, mais de x vezes superior (inferior) às dos países de renda baixa, ceteris paribus; as dos países de renda média são, em média, x vezes superior (inferior) às dos países de renda baixa, ceteris paribus.
+
+4) Coeficiente angular interativo
+
+interacao = Dados_CO2$setor2*alta   #a variável "interacao" captará o efeito de interação entre a participação da indústria e o grupo de países de renda alta.
+modelo5 = lm (log(co2) ~ alta + setor2 + interacao, data = Dados_CO2)
+summary(modelo5)    #interpretação de setor2 + alta*setor: (i) países que NÃO são de renda alta (alta=0), o impacto parcial de um acréscimo percentual da participação da indústria no PIB sobre as emissões de CO2 será, em média, de x(100)% (CO2 = setor2); (ii) para os países de renda alta (alta=1), o impacto parcial seria, em média, de x(100)% (CO2 = setor2 + interacao).
+
+5) Mudança estrutural
+
+Testar se há mudança estrutural significa testar se pelo menos um dos coeficientes é diferente de zero; i.e., verifica-se a contribuição marginal das variáveis associadas aos coeficientes.
+
+Compara-se um modelo irrestrito:
+
+modelo5 = lm (log(co2) ~ alta + setor2 + interacao, data = Dados_CO2)
+
+Contra um modelo restrito:
+
+modelo6 = lm (log(co2) ~ setor2, data = Dados_CO2)
+
+Isto é, um teste de restrição
+
+library(car)
+linearHypothesis(modelo5, c ('alta=0','interacao=0'), test='F', data = Dados_CO2)    #h0 = ausência de mundança estrutural; h1 = há mudança estrutural. Isto é, se ho é rejeitada, há mudança estrutural no modelo6 (ou há quebra estrutural na relação entre co2 e setor2); logo, verifica-se que há, de fato, uma contribuição marginal das variáveis alta e interacao para explicar log(co2).
+
+AULA 9 - HETEROCEDASTICIDADE
+
+Definição: dispersão dos resíduos da regressão se altera em função dos valores das variáveis explanatórias.
+
+Causas: (1) natureza das variáveis (algumas relações são tipicamente heterocedasticas); (2) valores extremos; (3) falhas na especificação do modelo.
+
+Consequências: (i) o modelo clássico deixa de ser BLUE, uma vez que os estimadores deixam de ser eficientes (variância mínima) e assintoticamente eficientes; (ii) torna os testes de hipóteses inválidos.
+
+1) Identificação:
+
+roda-se um modelo como esse
+
+reg1 = lm (PRICE ~ LOTSIZE + SQRFT + BDRMS, data = hprice)
+summary(reg1)
+
+(i) análise gráfica:
+
+par(mfrow=c(1,2))   #par pode ser usado para definir ou consultar parâmetros gráficos.
+plot(hprice$LOTSIZE, reg1$residuals)
+plot(hprice$LOTSIZE, reg1$residuals^2)
+plot(hprice$SQRFT, reg1$residuals)
+plot(hprice$SQRFT, reg1$residuals^2)
+plot(hprice$BDRMS, reg1$residuals)
+plot(hprice$BDRMS, reg1$residuals^2)
+
+(ii) Testes formais (testes paramétricos):
+
+a) Teste de Breusch-Pagan
+
+library(lmtest)
+bptest(reg1)    #h0 = erros homocedásticos. Se h0 é rejeitada, os erros não apresentam variabilidade constante.
+
+b) Teste de White
+
+Inclui não-linearidades na regressão auxiliar do teste de Breusch-Pagan (i.e., aquele modelo auxiliar onde se regride os residos sobre as variáveis explicativas). Certifique-se que sua amostra é suficientemente grande para suportar a perda nos graus de liberdade neste teste.
+
+bptest(reg1, ~fitted(reg1) + fitted(reg1)^2)    #h0 = erros homocedásticos. Se h0 é rejeitada, os erros não apresentam variabilidade constante.
+
+2) Correção
+
+a) Estimadores robustos   #este procedimento ajusta os erros-padrão para que os testes estatísticos se tornem válidos (pelo menos para grandes amostras) na presença de heterocedasticidade. Observações: (i) o erro-padrão robusto pode ser maior ou menor que o erro-padrão não robusto; (ii) a estatística t também será robusta; (iii) use-o quando a amostra for suficientemente grande.
+
+(a.1) Exemplo 1: modelo linear
+
+suponha que no modelo linear a seguir os resíduos sejam heterocedásticos:
+
+reg1 = lm (PRICE ~ LOTSIZE + SQRFT + BDRMS, data = hprice)
+
+então, usando os estimadores robustos:
+
+library(stargazer)
+library(car)
+stargazer(coeftest(reg1), coeftest(reg1, vcov = hccm (reg1, type = 'hc0')), digits = 8, column.labels = c('Usual', 'Robusta'), type = 'text', out = 'robusta.txt', data = hprice)
+
+linearHypothesis(reg1, c('LOTSIZE', 'SQRFT'), vcov = hccm (reg1, type = 'hc0'))
+
+Dado o diagóstico de heterocedasticidade, o teste acima ajusta os erros-padrão (devido a White), de modo a tornar as estatísticas de testes de hipóteses robustas (válidas) ou confiáveis.
+
+(a.2) Exemplo 2: modelo log-log
+
+suponha um modelo log do tipo
+
+reg2 = lm (log(PRICE) ~ log(LOTSIZE) + log(SQRFT) + BDRMS, data = hprice)
+summary(reg2)
+
+verifica-se a presença de heterocedasticidade pelo teste Breusch-Pagan
+
+bptest(reg2)
+
+Supondo-se que não se pode rejeitar a hipótese de heterocedasticidade (i.e., rejeita-se h0), aplica-se a correção usando estimadores robustos:
+
+stargazer(coeftest(reg1), coeftest(reg1, vcov = hccm (reg2, type = 'hc0')),
+          digits = 8, column.labels = c('Usual', 'Robusta'), type = 'text', out = 'robusta2.txt', data = hprice)
+
+Ainda que os resultados das estatísticas usual e robusta sejam similares; apenas as estatísticas do estimador robustos são confiáveis.
+
+b) Mínimos Quadrados Generalizados (MQG):
+
+b.1) Mínimos Quadrados Ponderados - variância do erro conhecida (logo, tem-se 1/h)
+
+Passo a passo:
+
+(1) Obter uma regressão
+
+reg1 = lm (PRICE ~ LOTSIZE + SQRFT + BDRMS, data = hprice)
+
+(2) Uma vez que seja detectada heterocedasticidade na regressão, obtém-se os resíduos ao quadrado
+
+residuos = (reg1$residuals)^2
+
+(3) log dos resíduos ao quadrado
+
+lresiduos = log(residuos)
+
+(4) Regressão do log(residuos) em função das variáveis independentes:
+
+auxiliar = lm (lresiduos ~ LOTSIZE + SQRFT + BDRMS, data = hprice)
+summary(auxiliar)   #Observe que a significância estatística aqui é despresível para análise. Busca-se apenas os valores dos estimadores.
+
+(5) Valores estimados da regresão auxiliar
+
+g = auxiliar$fitted.values
+
+(6) Fator de ponderação
+
+h = exp(g)
+
+(7) Correção no modelo inicial aplicando o MQG (Mínimos Quadrados Ponderados (MQP)):
+
+modeloMQG = lm (PRICE ~ LOTSIZE + SQRFT + BDRMS, weights = 1/h, data = hprice)
+
+b.2) Mínimos Quadrados Generalizados Factíveis (MQGF) - variância do erro desconhecida (logo, tem-se 1/h^)
+
+Aplica-se o mesmo procedimento anterior. A diferença, neste caso, está no desconhecimento do valor verdadeiro do fator de ponderação h.
+
+Pela função stargazer, aplica-se e compara-se os diversos métodos de correção de heterocedasticidade para um modelo inicial qualquer:
+
+stargazer(coeftest(reg1),coeftest(reg1,vcov=hccm(reg1,type='hc0')),
+          coeftest(modeloMQG),
+          coeftest(modeloMQG,vcov=hccm(modeloMQG,type='hc0')),
+          digits=8,
+          column.labels=c('MQO','Robusta','MQG-factível','MQG Robusto'),
+          type='text',out='saida.txt',data=hprice)
+          
+Observações: (i) uma vez detectada heterocedasticidade no modelo, o MQGF (ou MQG) é consistente e assimptoticamente mais eficiente que o MQO; (ii) O MQGF requer que a forma funcional do modelo de regressão esteja com especificação correta.
+
+AULA 10 - MODELO DE REGRESSÃO COM SÉRIES DE TEMPO
+
+Sob as hipóteses de séries temporais ST.1 a ST.6, os estimadores de MQO são os melhores estimadores lineares não-viesados e normalmente distribuidos, condicionais as variáveis explanatórias.
+
+Ausência de correlação serial: Condicionados às variáveis explanatórias, os erros em dois períodos de tempo são não correlacionados.
+
+1) Modelos Estáticos    #I.e., regressores e regressando relacionados contemporaneamente (efeito imediato em t).
+
+a) Exemplo 1 (modelo linear):
+
+Após carregar os dados, escreva, por exemplo,
+
+Dados = ts(INTDEF, start = 1948, frequency = 1)
+layout(1:3)
+plot(Dados[,2], xlab='Ano', ylab='Taxa de Juros - I3')
+plot(Dados[,3], xlab='Ano', ylab='Taxa de inflação - INF')
+plot(Dados[,4], xlab='Ano', ylab='Déficit - DEF')
+
+Esses procedimentos acima são necessários para o R interpretar que se trata de base de dados para uma série de tempo.
+
+Assim, o modelo pode ser escrito como
+
+modelo1 = lm (I3 ~ INF + DEF, data = Dados)
+summary(modelo1)
+anova(modelo1)    #Nota: Observe que pode haver uma tendência nas séries. Isto é, a média pode variar ao longo do tempo (i.e., a série se torna não estacionária). E, portanto, a regressão se torna espúria. Se assim ocorrer, o R² é afetado pela presença dessa tendência. Assim, o modelo precisaria de um novo tratamento para que esse componente espúrio seja eliminado.
+
+library(car)
+linearHypothesis(modelo1,'INF=0')
+
+b) Exemplo 2 (modelo linear com binárias):
+
+rm(list=ls(all.names = TRUE))
+
+Após carregar os dados, especifica-os
+
+Dados = ts (FERTIL3, start = 1913, frequency = 1)
+layout(1:2)
+plot(Dados[,2], xlab='Ano', ylab='GFR')
+plot(Dados[,3], xlab='Ano', ylab='PE')
+
+Adiciona-se as variáveis binárias
+
+year=FERTIL3[,1]
+ww2 = ts(as.numeric((year>=1941) & (year>=1945)))
+pill = ts (as.numeric(year>=1963))
+
+O modelo pode ser escrito como
+
+modelo2 = lm(GFR ~ PE + ww2 + pill, data = Dados)
+summary(modelo2)
+
+2) Modelos de Defasagens Distribuídas Finitas (DDF) - Modelos Dinâmicos
+
+library(dynlm)
+
+n = length (Dados[,1])
+modelo3 = lm (GFR [3:n] ~ PE [3:n] + PE[2:(n-1)] + PE [1:(n-2)] + ww2[3:n] + pill[3:n], data = Dados)
+summary(modelo3)
+
+Uma vez que as variáveis NÃO sejam estatisticamente significativas, verifica-se uma possível correlação relevante entre as variáveis explicativas (correlação em z (= PE) e suas defasagens -> multicolinearidade):
+
+cor(FERTIL3$PE[3:n], FERTIL3$PE[2:(n-1)])
+cor(FERTIL3$PE[3:n], FERTIL3$PE[1:(n-2)])
+
+layout(1:1)
+acf(FERTIL3$PE)   #função de autocorrelação (acf)
+
+Detectada a multicolinearidade, verifica-se a significância conjunta de PE:
+
+library(car)
+
+y = FERTIL3$GFR[3:n]
+x1 = FERTIL3$PE[3:n]
+x2 = FERTIL3$PE[2:(n-1)]
+x3 = FERTIL3$PE[1:(n-2)]
+reg = lm (y ~ x1 + x2 + x3 + ww2 [3:n] + pill [3:n], data = Dados)
+
+linearHypothesis(reg, c('x1 = 0', 'x2 = 0', 'x3 = 0'), test = 'F', data = Dados)
+
+E as defasagens, são necessárias? Verifica-se:
+
+linearHypothesis(reg, c('x2 = 0', 'x3 = 0'), test = 'F', data = Dados)
+
+Será que a propensão de longo prazo (a soma dos coeficientes PE) é estatisticamente diferente de zero?
+
+PLP = reg$coefficients[2]+reg$coefficients[3]+reg$coefficients[4]
+PLP
+
+linearHypothesis(reg, c('x1 + x2 + x3 = 0'), test = 'F', data = Dados)
+
+Assim, tomando-se ao longo do tempo, as defasagens são estatisticamente (in)significantes.
+
+3) Tendência    #deve-se incluir o termo de tendência na regressão; não incluir pode resultar em regressão espúria.
+
+Procedimento (exemplo: investimento imobiliário e preços de imóveis):
+
+rm(list = ls(all.names = TRUE))   #em seguida carrega-se os dados "HSEINV"
+
+lninvpc = log(HSEINV$INV/HSEINV$POP)
+lnprice = log (HSEINV$PRICE)
+lninvpc = ts(lninvpc, start = 1947, frequency = 1)
+lnprice = ts(lnprice, start = 1947, frequency = 1)
+
+layout(1:2)
+plot(lninvpc, xlab = 'ano', ylab = 'Investimento')
+plot(lnprice, xlab = 'ano', ylab = 'preço')
+
+reg1 = lm(lninvpc ~lnprice)
+summary(reg1)
+
+lninvpc = log(HSEINV$INV/HSEINV$POP)
+lnprice = log (HSEINV$PRICE)
+lninvpc = ts(lninvpc, start = 1947, frequency = 1)
+lnprice = ts(lnprice, start = 1947, frequency = 1)
+
+layout(1:2)
+plot(lninvpc, xlab = 'ano', ylab = 'Investimento')
+plot(lnprice, xlab = 'ano', ylab = 'preço')
+
+reg1 = lm(lninvpc ~lnprice)
+summary(reg1)
+
+trend = ts(1:length(lninvpc), start = 1947, frequency = 1)
+reg2 = lm (lninvpc ~ lnprice + trend)
+summary(reg2)
+
+AULA 11 - USO DE MQO COM DADOS DE SÉRIES TEMPORAIS
+
+O processo estocástico {yt:t=1,2, ...,} é estacionário se, para todas as coleções de índices temporais 1<=t1<t2< ...<tm, a distribuição conjunta de (yt1, yt2, ..., ytm) é a mesma que a distribuição conjunta de (yt1+h, yt2+h, ..., ytm+h) para todos os inteiros h>=1.
+
+Na prática é impossível conhecer todas as funções conjuntas de yt1, yt2, ..., ytm.
+
+Assim, usa-se o conceito de processo fracamente estacionário, desde que a série: (1) apresente média constante; (2) apresente variância constante; (3) a covariância entre dois valores de y depende apenas da distância h entre eles (i.e., não importa qual seja o período t, a covariância entre yt e yt+h será sempre a mesma).
+
+Série temporal fracamente dependente (integrada de ordem zero = I(0)): um processo aleatório de série temporal {yt:t=1, ..., n} é chamado de fracamente dependente se yt e yt+h forem "quase independentes" enquanto h aumenta sem limites. No caso do passeio aleatório, tem-se I(1).
+
+O modelo de regressão clássico com séries de tempo requer estacionaridade e dependência fraca (de modo a satisfazer o teorema do limite central).
+
+Raiz unitária: Uma característica de uma série NÃO estacionária é que, ao representá-la por um modelo de
+regressão de Yt em função de seus valores defasados (Yt-1, Yt-2, ...), a soma dos coeficientes
+associados às variáveis defasadas será igual a 1 (= "rô"=1). Para as séries estacionárias, a soma desses
+coeficientes será inferior a 1 (="rô"<1).
+
+Em um modelo autorregressivo de 1ª ordem, ou AR(1):
+
+Yt = (rô)Yt-1 + et    #rô (= inércia) = coeficiente de autocorrelação de 1ª ordem; et (= ruído branco) = uma série com média igual a zero, variância constante e não autocorrelacionada.
+
+1) Terminologia de processos estocásticos estacionários:
+
+(a) ruído branco: Yt = et.
+
+(b) tendência determinística (processo estacionário em tendência ou estacionário após a remoção da tendência): Yt = alpha + (Beta)t + et. Embora não seja constante, a média pode ser prevista com exatidão conhecendo-se o valor de t.
+
+(c) Tendência determinística com componente autorregressivo estacionário: Yt = alpha + (Beta)t + (rô)Yt-1 + et, onde rô<1. Choques são absorvidos com o tempo (rô<1) e o processo tende a ser estacionário em torno de uma tendência determinística (Beta)t.
+
+2) Terminologia de processos estocásticos NÃO estacionários:
+
+(a) Passeio aleatório sem deslocamento: Yt = Yt-1 + et. Choques ocorridos no presente serão absorvidos integralmente nos períodos posteriores. A variância tem trajetória explosiva. Para transformá-la em uma série estacionária, toma-se a primeira diferença de Y: ??Yt = Yt - Yt-1 = et.
+
+(b) Passeio aleatório com deslocamento: Yt = alpha + Yt-1 + et. Além de absorver integralmente os choques passados, apresenta uma tendência constante de variação em cada período (alpha). Média e variância variam com o t. Para transformá-la em uma série estacionária, faz-se ??Yt = alpha + et.
+
+(c) Passeio aleatório com deslocamento e tendência determinística: yt = alpha + (Beta)t + yt-1 + et. Apresenta comportamento errático, imprevisível, em torno de uma tendência determinística (Beta)t. Pode-se gerar um processo estacionário em tendência por meio de transformação algébrica: ??Yt = alpha + (Beta)t + et.
+
+3) Decisão sobre uma série temporal ser I(1):
+
+(a) Em um processo AR(1), se |rô|<1, então o processo é I(0).
+
+(b) Se a série tem tendência, deve-se remover; em seguida, deve-se calcular a correlação amostral entre yt e yt-1 (i.e., calcular a autocorrelação amostral de primeira ordem de {yt}).
+
+(c) Teste de Raiz Unitária.
+
+4) Exemplo: Modelo salário e produtividade
+
+após carregar os dados "earns", escreve-se
+
+dados = ts(earns[,2:3],start=1947, frequency = 1)
+View(dados)
+layout(1:2)
+plot(dados[,1],xlab='Ano', ylab='Produtividade')
+plot(dados[,2],xlab='Ano', ylab='Salário')
+
+outphr = log(dados[,1])
+hrwage=log(dados[,2])
+
+n=length(outphr)
+trend=ts(1:n)
+
+modelo1 = lm (hrwage ~ outphr + trend)
+summary(modelo1)
+
+Para eliminar a tendência, faz-se:
+
+aux1 = lm (hrwage ~ trend)
+summary(aux1)
+aux2 = lm (outphr ~ trend)
+summary(aux2)
+
+plot.ts(aux1$residuals)
+plot.ts(aux2$residuals)
+
+modelo2 = lm (aux1$residuals ~ aux2$residuals)
+summary(modelo2)
+cor(aux1$residuals[1:(n-1)], aux1$residuals[2:n])
+cor(modelo2$residuals[1:(n-1)], modelo2$residuals[2:n])
+layout(1:1)
+acf(modelo2$residuals)
+
+Uma vez que após tratar a tendência como determinística não se resolveu o problema, faz-se:
+
+modelo3 = lm(diff(hrwage) ~ diff(outphr))
+summary(modelo3)
+
+cor(modelo3$residuals[1:(n-2)], modelo3$residuals[2:(n-1)])
+layout(1:1)
+acf(modelo3$residuals)
+
+Análise gráfica dos resíduos
+
+layout(1:2)
+plot.ts(modelo2$residuals)
+plot.ts(modelo3$residuals)
+
+plot(modelo2$residuals[1:(n-1)], modelo2$residuals[2:n])
+plot(modelo3$residuals[1:(n-2)], modelo3$residuals[2:(n-1)])
+
+AULA 12 - CORRELAÇÃO SERIAL E HETEROCEDASTICIDADE EM REGRESSÃO DE SÉRIES TEMPORAIS
+
+1) Teste de correlação serial - detecção
+
+Método gráfico. Como? (i) representá-los graficamente em relação ao tempo (plot(modelo$residuals)); (ii) representar graficamente (resíduo)t contra (resíduo)t-1.
+
+(1) Testes onde os regressores são estritamente exógenos:   #Nota: geralmente, conclui-se que a correlação serial é um problema a ser tratado apenas se h0 for rejeitado ao nível de 5%.
+
+(a) Teste t de Correlação Serial AR(1)    #H0: ausência de correlação serial (rô=0); H1: rô > 0.
+
+Passos:
+
+(i) estime yt sobre xt1, ..., xtk e obtenha os resíduos do MQO;
+(ii) estime os (resíduos)t sobre os (resíduos)t-1 e obtenha o estimador "rô" de (resíduos)t-1 e sua estatística t;
+(iii) use essa estatística t para testar H0: "rô"=0.
+
+(b) Teste d de Durbin-Watson (DW) sob as hipóteses clássicas de MQO   #H0: ausência de correlação serial (rô = 0); H1: rô > 0.
+
+Para rejeitar h0 em favor de h1, deve-se ter DW < 2. Desvantagem: entre os valores críticos, o teste é inconclusivo. Se o valor do teste DW < dL, então se rejeita h0; se DW > dU, então não se rejeita h0.
+
+(1.1) Exemplo de teste de correlação serial: curva de Phillips
+
+após carregar os dados "Phllips", ajusta-se os dados
+
+dados = ts(Phillips[,2:3], start=1948, frequency = 1)
+
+layout(1:2)
+plot(dados[,1], xlab='anos', ylab='inflação')
+plot(dados[,2], xlab='anos', ylab='desemprego')
+
+library(lmtest)
+library(dynlm)
+
+O modelo é então escrito como
+
+reg1 = lm (INF ~ UNEM, data = dados)
+summary(reg1)
+
+Análise gráfica dos resíduos
+
+res1 = resid(reg1)
+layout(1:2)
+plot.ts(res1)
+n=length(res1)
+plot(res1[1:(n-1)], res1[2:n])
+
+Verifica-se se a regressão atende a hipótese de homocedasticidade
+
+bptest(reg1)
+
+Aplica-se o teste t de correlação serial AR(1)
+
+mod = dynlm(res1 ~ L(res1))
+mod = lm(res1[2:n] ~ res1[1:(n-1)])
+summary(mod)
+
+Aplica-se o teste de Durbin-Watson (DW)
+
+dwtest(reg1)    #H0: ausência de correlação serial.
+
+Alternativamente, pode-se testar a versão linear da curva de Philips de expectativas aumentadas (reg.ea)
+
+Para isso, toma-se a primeira diferença (dynlm(d(Y))):
+
+reg.ea = dynlm(d(INF) ~ UNEM, data = dados)
+summary(reg.ea)
+
+Supondo uma taxa natural (tn) de juros reagindo positivamente à inflação e negativamente ao desemprego
+
+tn = reg.ea$coefficients[1]/(-reg.ea$coefficients[2])
+tn
+
+Testa-se a possibilidade de correlação serial
+
+residual.ea = resid(reg.ea)
+coeftest(dynlm(residual.ea ~ L(residual.ea)))
+
+
+(2) Testes onde os regressores NÃO são estritamente exógenos
+
+(a) Proposta de Durbin
+
+Passo a passo:
+
+(i) Compute a regressão MQO de yt sobre xt1, xt2, ..., xtk e obtenha os (resíduos)t.
+(ii) Compute os (resíduos)t sobre xt1, ..., xtk, (resíduos)t-1 e obtenha o estimador de "rô" de (resíduos)t-1 e a estatística t associada.
+(iii) Teste H0: "rô" = 0 contra a hipótese oposta H1.
+
+(b) Teste de Breusch-Godfrey (BG) para correlação serial AR(q)    #Exige-se a hipótese de homocedasticidade. Aceita-se, contudo, o caso das estatísticas robustas de heterocedasticidade.
+
+(i) Compute a regressão MQO de yt sobre xt1, xt2, ..., xtj e obtenha os (resíduos)t.
+(ii) Compute os (resíduos)t sobre xt1, ..., xtk, (resíduos)t-1, (resíduos)t-2, ..., (resíduos)t-q, para todo t = (q + 1), ..., n.    #incluir xtj na regressão faz o teste válido com ou sem a hipótese de exogenidade estrita.
+(iii.a) Compute o teste F para verificar a significância conjunta de (resíduos)t-1, (resíduos)t-2, ..., (resíduos)t-q.
+
+Ou
+
+(iii.b) Use o teste LM.
+
+2) Inferência Robusta em relação à correlação serial
+
+(1) Matriz de variância e covariância de Newey e West
+
+(a) estime por MQO yt = (Beta)0 + (Beta)1x1t + ... + (Beta)kxkt + ut e obtenha os estimadores da variância dos erros, dos erros (hat_u) e do desvio padrão do coeficiente j.
+(b) calcule os resíduos da regressão de xjt sobre os demais xjt. Isto é: xjt = lm (xjt ~ x2t, x3t...). hat_r = xjt$residuals
+(c) compute hat_at = (hat_r)*(hat_u).
+(d) escolha um inteiro g>0 e calcule hat_v (ver Wooldridge, 2016, cap. 12, p. 389).
+(e) obtenha o erro padrão robusto em relação à correlação serial (ver Wooldridge, 2016, cap. 12, p. 389).
+
+(2) Correção da correlação serial com regressores estritamente exógenos
+
+Usa-se Mínimos Quadrados Generalizados Factível. Deve-se estimar rô do modelo matricial. Há duas formas para isso: (a) estimação de Cochrane-Orcutt (CO); (b) estimação de Prais-Winsten (PW).
+
+3) Exemplo - Emprego e salário em Porto Rico
+
+após carregar os dados "PRMINWGE", ajusta-se os dados e escreve-se o modelo
+
+dados = ts(PRMINWGE, start = 1950, frequency = 1)
+trend = ts(1:nrow(dados))
+reg = lm(log(PREPOP) ~ log(MINCOV) + log(USGNP) + log(PRGNP) + trend, data = dados)
+summary(reg)
+
+Análise dos resíduos:
+
+res1 = resid(reg)
+n = nrow(dados)
+layout(1:2)
+plot.ts(res1)
+plot(res1[1:(n-1)],res1[2:n])   #Verifique se há uma tendência de crescimento na relação entre os resíduos
+
+Teste de homocedasticidade
+
+Detecção:
+
+library(lmtest)
+bptest(reg)
+
+library(car)
+coeftest(reg, vcov = hccm(reg,type='hc0'))
+
+Ajuste:
+
+library(stargazer)
+stargazer(coeftest(reg), coeftest(reg, vcov = hccm(reg,type='hc0')),
+          digits=5,column.labels = c('Usual','Robusto'),type='text')
+
+Teste de correlação de Breusch-Godfrey. É uma função de autocorrelação parcial. Indica quantos atrasos devem ser colocados no modelo para explicar o ruído.
+
+acf(res1)
+pacf(res1)
+bgtest(reg, order=1)
+
+Estatísticas robustas
+
+library(sandwich)
+stargazer(coeftest(reg), coeftest(reg,vcovHAC),
+          digits=5,column.labels = c('Usual','Robusto'),type='text')
+
+Correção de correlação serial de CO
+
+library(orcutt)
+
+coch = cochrane.orcutt(reg)
+coch
+summary(coch)
+
+Correção de correlação serial de PW
+
+library(prais)
+pw = prais_winsten(reg)
+pw
+summary(pw)
+
+AULA 13 - VARIÁVEIS INSTRUMENTAIS
+
+Variável explicativa endógena: qualquer variável explicativa num modelo de regressão linear que for correlacionada com o termo de erro.
+
+Problema da endogeneidade: duas ou mais variáveis determinadas conjuntamente em um modelo. Exemplo: variáveis preço e quantidade em um sistema de oferta e demanda.
+
+Causas da endogeneidade: (1) omissão de variáveis relevantes correlacionadas com x1, ..., xk; (2) erros de medição em x1, ..., xk (e.g. uma proxy mal especificada); (3) simultaneidade entre y e uma ou mais variáveis explicativas.
+
+Consequências: os estimadores de MQO tornam-se viesados, inconsistentes e ineficientes.
+
+Solução: empregar variáveis instrumentais com o objetivo de auxiliar na busca de estimadores consistentes.
+
+Variáveis instrumentais (VI): uma vez que se tenha um modelo onde a covariância entre as variáveis explanatórias e os erros são diferentes de zero, toma-se uma variável z, a qual é (i) NÃO correlacionada com u (não se pode observar); e (ii) correlacionada com x (pode-se testar). Chama-se z de variável instrumental de x.
+
+1) Mínimos Quadrados de Dois Estágios (MQ2E)    #quando se exige mais de uma variável instrumental para uma variável endógena (i.e., a equação estrutural encontra-se sobreidentificada)
+
+O procedimento é feito em dois estágios: (1º ESTÁGIO) da equação estrutural y1 = (Beta)0 + (Beta)1y2 + (Beta)2z1 + u1, supõe-se que uma das variáveis explanatórias é endógena (y2); em seguida, supõem-se a existência de z2 e z3 correlacionados a y2 e não correlacionadas a u1; chega-se a forma reduzida ao regridir y2 sobre z1, z2, z3 (nota: o estimador z1 subjacente ao regressor exógeno (Beta)2 é usado como instrumento dele mesmo na matriz de instrumentos Z). A forma reduzida requer que os coeficientes de z2 e z3 sejam diferentes de zero para que as variáveis instrumentais sejam válidas. Aplica-se um teste de restrição de Wald. Baum (2006) considera que se a estatística F exceder 10, o instrumento é considerado forte; (2º ESTÁGIO): estimação da equação na forma reduzida; verificação se os coeficientes de z2 e z3 são diferentes de zero; usar (ou não) o estimador de y2 como variável instrumental de y1 sobre z1 e o estimador de y2 (i.e., a VI).
+
+Observações: (1) o estimador MQ2E é menos eficiente que o MQO quando as variáveis explicativas são, de fato, exógenas; (2) MQO e MQ2E fornecem estimadores consistentes se a condição de exogeneidade estiver satisfeita; (3) deve-se fazer teste de endogeneidade de uma variável explicativa para verificar se é necessário usar MQ2E.
+
+2) Teste de endogeneidade de Hausman    #baseia-se na comparação das estimativas de MQO e MQ2E, de modo a determinar se as diferenças são significativamente diferentes de zero.
+
+Passo a passo:
+
+(a) estime a forma reduzida da equação estrutural sobre as variáveis exógenas (y2 sobre z1, z2, z3, ..., zn) e obtenha os resíduos dessa regressão (hat_v2);
+(b) adicione esses resíduos na equação estrutural (y1) e estime o modelo por MQO. Se coeficiente de hat_v2 for nesta regressão significativamente diferente de zero, conclui-se que y2 é endógeno (onde h0 = coeficiente de hat_v2 = 0 = os resíduos da equação do regressor y2 não afetam o comportamente do regressando y1; logo y2 é, de fato, exógeno). Quanto a heterocedasticidade, pode-se usar um teste t robusto.
+
+Contudo, qual a validade do instrumento (z)? Isto é, como se sabe que os instrumentos escolhidos são independentes do termo de erro?
+
+3) Teste de Restrições Sobreidentificadoras de Sargan   #Note que é válido apenas quando a variável explicativa endógena possui mais de uma variável instrumental.
+
+H0: todas as VIs são NÃO correlacionadas com o erro.
+
+Passo a passo:
+
+(a) estime a equação estrutural por MQ2E;
+(b) obtenha os resíduos (hat_u1);
+(c) regrida hat_u1 sobre todas as variáveis exógenas por MQO;
+(d) obtenha o R²;
+(e) sob a h0, tem-se: nR² ~ (Qui-quadrado)q, onde q é o número de VIs menos o número de regressores endógenos presentes no modelo.
+
+4) Exemplo 1: salários e a suspeita de endogeneidade na variável experiência.
+
+4.1) modelo com uma variável instrumental:
+
+Carrega-se os dados "MROZ"
+
+Faz-se inicialmente o seguinte procedimento:
+
+dados = subset(MROZ, !is.na(MROZ$WAGE))
+
+Nomeando as variáveis, tem-se
+
+n = nrow(dados)
+lwage = log(dados$WAGE)
+educ = dados$EDUC
+exper = dados$EXPER
+exper2 = (dados$EXPER)^2
+motheduc = dados$MOTHEDUC
+fatheduc = dados$FATHEDUC
+huseduc = dados$HUSEDUC
+
+onde o modelo estrutural é escrito como
+
+reg1 = lm (lwage ~ educ + exper + exper2)
+summary(reg1)
+
+Toma-se motheduc como variável instrumental
+
+Verificar a correlação entre a variável instrumental e educ:
+
+reg.aux = lm (educ ~ motheduc)
+summary(reg.aux)    #Observe que, de fato, a correlação entre as variáveis é estatisticamente diferente (igual) de zero. Isso sugere que educ (NÃO) é uma variável endógena.
+
+Assim, estima-se o modelo estrutural considerando a variável instrumental:
+
+library(AER)
+reg.iv = ivreg(lwage ~ educ + exper + exper2 | motheduc + exper + exper2)
+summary(reg.iv)   #Isto é, o valor do estimador educ cai (aumenta) quando se isola o efeito correlacionado com motheduc. Ignora-se, por enquanto, a significância estatística.
+
+4.2) modelo com mais de uma variável instrumental - equação estrutural sobreidentificada
+
+Usando mais de um instrumento (motheduc, fatheduc e huseduc), precisa-se usar o método de mínimos quadrados de dois estágios (MQ2E), uma vez que L > k (tem-se então uma equação sobreidentificada)
+
+Seja o primeiro estágio:
+
+reg2.aux = lm (educ ~ motheduc + fatheduc + huseduc + exper + exper2)
+summary(reg2.aux)
+
+Para avaliar se os instrumentos são fortes, usa-se o teste de restrição de Wald:
+
+linearHypothesis(reg2.aux, c('motheduc = 0', 'fatheduc = 0', 'huseduc = 0'))
+
+Logo, os instrumentos podem ser considerados fortes (fracos), uma vez que o resultado do teste F foi superior (inferior) a 10.
+
+Seja o segundo estágio:
+
+reg2.iv = ivreg(lwage ~ educ + exper + exper2 | motheduc + fatheduc + huseduc + exper + exper2)
+summary(reg2.iv)    #Observe que a inclusão de mais variáveis instrumentais para explicar educ, tornou esta última variável estatísticamente significante (insignificante) em relação ao modelo com uma VI.
+
+Verifica-se se o modelo é homocedástico:
+
+bptest(reg2.iv)
+
+Caso a variância do erro não seja constante, usa-se a estatística robusta para corrigir o modelo:
+
+summary(reg2.iv, vcov. = sandwich)
+
+Como verificar a necessidade dos instrumentos? Aplicam-se os testes de instrumentos (Hausman e Sargan):
+
+summary(reg2.iv, vcov. = sandwich, diagnostics = TRUE)    #Wu-Hausman h0: estimativas MQO = MQ2E, logo a variável NÃO é endógena, e h1: a variável é endógena supondo que as VIs sejam exógenas. Para verificar a exogeneidade das VIs, usa-se o teste de Sargan, em que h0: todas as VIs são NÃO correlacionadas com o erro (os instrumentos são válidos).
+
+5) Exemplo 2: curva de Phillips (um modelo dinâmico)
+
+Carrega-se os dados "Phillips"
+
+Faz-se o procedimento:
+
+dados = ts(Phillips, start = 1948, frequency = 1)
+n-nrow(dados)
+
+Toma-se a primeira diferença:
+
+y = diff(Phillips$INF)
+reg1.inf = lm(y ~ UNEM[2:n], data=dados)
+summary(reg1.inf)
+
+Usa-se o instrumento UNEM(t-1):
+
+reg.aux.inf = lm(UNEM[2:n] ~ UNEM[1:(n-1)], data=dados)
+summary(reg.aux.inf)    #Verifica-se a associação entre UNEMt e UNEMt-1
+
+Assim, estima-se o modelo estrutural considerando as variáveis instrumentais:
+
+rev.iv = ivreg(y ~ UNEM[2:n] | UNEM[1:(n-1)], data=dados)
+summary(rev.iv)
+
+Verifica-se a presença de heterocedasticidade:
+
+bptest(rev.iv)
+bgtest(rev.iv)
+
+Aplica-se os testes de instrumentos (Hausman e Sargan) para verificar a necessidade dos instrumentos:
+
+summary(rev.iv, diagnostics = TRUE)

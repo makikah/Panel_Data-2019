@@ -1,0 +1,334 @@
+---
+title: |
+  |
+  | State University of Campinas - UNICAMP  
+  |
+  |
+  |
+  | *IMPACTO DO CRESCIMENTO ECONÔMICO SOBRE O USO DE ENERGIA RENOVÁVEL*
+  |
+  |       *Trabalho Final HO-235*
+  |
+  |
+  | Supervisor: Alexandre Gori Maia
+  |
+  |
+author: |
+  | ------------------------------------------------------
+  | João Paulo F. Fenelon () e Henri Makika (211042)
+  | ------------------------------------------------------
+
+
+date: "Julho 10, 2019"
+output: pdf_document
+---
+
+\begin{center}
+\includegraphics[width=50mm]{logo-unicamp-name-line-blk-red-0240.eps}
+\end{center}
+
+\newpage
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE,
+                      fig.width = 8, fig.height = 6)
+```
+
+
+## 1 INTRODU??O
+
+Este trabalho apresenta e discute os resultados de um modelo de regress?o em que se analisa o impacto do crescimento sobre o uso de energia de fontes renov?veis. Sup?e-se que ? medida que a renda das economias aumenta ocorre um processo de substitui??o das fontes de energia f?seis por mais limpas (renov?veis). Utiliza-se na primeira parte um modelo cl?ssico baseado no m?todo de m?nimos quadrados ordin?rios (OLS), de modo a estimar os resutados para o ano de 2010; em seguida, usa-se o modelo de dados em painel para avaliar um per?odo mais longo, de 1964 a 2018. Os dados foram extra?dos do world development indicators do Banco Mundial.
+
+## 2 ESTIMA??O E DISCUSS?O DOS RESULTADOS
+
+S?o utilizados os seguintes dados retirados do World Development Indicadors do Banco Mundial:
+
+```{r}
+library(readxl)
+library(dplyr)
+library(stargazer)
+library(lmtest)
+library(normtest)
+library(car)
+library(plm)
+
+Data_Renewable <- read_excel("~/Videos/Inverno 2019/Ensaio/Data_Renewable.xlsx",na = "..")
+
+dados_transversal <- Data_Renewable %>% filter(ano==2010)
+#View(dados_transversal)
+summary(dados_transversal[,5:9])
+```
+
+Os dados utilizados referem-se ao ano de 2010. H? 217 observa??es (pa?ses). As seguintes vari?veis s?o consideradas ao longo do trabalho:
+
+*renovavel = produ??o de energia de fontes renov?veis em kWh, excluindo hidroel?tricas;
+*pib = produto interno bruto em US$ a pre?os de 2010;
+*populacao = total da popula??o;
+*eletricidade = consumo de energia el?trica em kWh per capita;
+*energia = uso de energia em kg per capita.
+
+```{r}
+par(mfrow = c(2,3))
+plot(dados_transversal$renovavel, type = "h", lwd = 3, main = "Renov?vel", 
+     xlab = "Pa?ses", ylab = "Frequ?ncia")
+plot(dados_transversal$pib, type = "h", lwd = 3, main = "PIB", xlab = "Pa?ses", 
+     ylab = "Frequ?ncia")
+plot(dados_transversal$populacao, type = "h", lwd = 3, main = "Popula??o", 
+     xlab = "Pa?ses", ylab = "Frequ?ncia")
+plot(dados_transversal$eletricidade, type = "h", lwd = 3, main = "Eletricidade", 
+     xlab = "Pa?ses", ylab = "Frequ?ncia")
+plot(dados_transversal$energia, type = "h", lwd = 3, main = "Energia", 
+     xlab = "Pa?ses", ylab = "Frequ?ncia")
+
+#caso fosse necess?rio eliminar algum pa?s da amostra, o procedimento seria o seguite: dados2 <- dados[ ! dados$codigo %in% c("paisA", "paisB", "paisZ"), ]
+```
+
+Sup?e-se que a produ??o de energia renov?vel (renovavel) depende positivamente das vari?veis produto interno bruto (pib) e negativamente da popula??o (populacao). Argumenta-se que pa?ses com maior PIB tendem, ao longo do tempo, substituir as fontes de energia f?seis por fontes mais limpas; pa?ses que apresentam maior popula??o tendem a consumir maior quantidade energia f?sel. O que foi dito pode ser estimado por meio de um modelo de regress?o linear baseado no m?todo de m?nimos quadrados ordin?rios (OLS) na forma:
+
+$$\hat {renovavel}_i = \hat \alpha + \hat \beta_1 pib_i + \hat \beta_2 populacao_i + \hat e_i$$
+
+Como forma de encontrar o melhor ajuste na forma funcional do modelo, deve-se testar algumas especifica??es. As especifica??es do modelo na forma linear, linear-log, log-linear e log-log s?o descritas a seguir:
+
+```{r}
+linear <- lm(renovavel ~ pib + populacao, data = dados_transversal)
+#summary(linear)
+
+linlog <- lm(renovavel ~ log(pib) + log(populacao), data = dados_transversal)
+#summary(linlog)
+
+loglin <- lm(log(renovavel+1) ~ pib + populacao, data = dados_transversal) 
+#o uso de "+1" ? aplicado uma vez que existem muitos valores 0 no vetor renov?vel.
+#summary(loglin)
+
+loglog <- lm(log(renovavel+1) ~ log(pib) + log(populacao), data = dados_transversal)
+#summary(loglog)
+
+stargazer(linear, linlog, loglin, loglog, digits = 4, type = 'text',
+          column.labels = c("", "", "", ""),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+```
+
+```{r}
+bptest(linear) #rejeita a nula
+bptest(linear, ~fitted(linear) + fitted(linear)^2) #n?o rejeita a nula
+
+bptest(linlog)  #rejeita a nula
+bptest(linlog, ~fitted(linlog) + fitted(linlog)^2)  #n?o rejeita a nula
+
+bptest(loglin)  #n?o se rejeita a nula de homocedasticidade.
+bptest(loglin, ~fitted(loglin) + fitted(loglin)^2)  #n?o rejeita a nula
+
+bptest(loglog)  #rejeita a nula
+bptest(loglog, ~fitted(loglog) + fitted(loglog)^2)  #n?o rejeita a nula
+
+jb.norm.test(linear$residuals)
+shapiro.test(linear$residuals)  
+
+jb.norm.test(linlog$residuals)
+shapiro.test(linlog$residuals)
+
+jb.norm.test(loglin$residuals)
+shapiro.test(loglin$residuals)
+
+jb.norm.test(loglog$residuals)
+shapiro.test(loglog$residuals)
+#em todos os modelos rejeita-se a hip?tese nula de normalidade
+
+vif(linear)
+vif(linlog)
+vif(loglin)
+vif(loglog)
+#todos n?o apresentam suspeitas de multicolinearidade
+
+
+resettest(linear)
+resettest(linlog)
+resettest(loglin)
+resettest(loglog)
+#apenas o modelo loglog n?o rejeita a nula de correta especifica??o do modelo.
+
+AIC(linear, linlog, loglin, loglog)
+BIC(linear, linlog, loglin, loglog)
+```
+
+Escolhe-se o modelo linear, uma vez que foi aquele que apresentou melhor ajuste de acordo com o $R^2$. Ademais, o teste de White n?o verificou suspeitas de heterocedasticidadee em nenhum dos modelos; a hip?tese de normalidade dos res?duos foi rejeitada em todos os modelos, conforme os teste Jarque-Bera e Shapiro-Wilk; e o teste geral de especifica??o Ramsey-Reset rejeitou a hip?tese de correta especifica??o para todos os modelos, exceto o modelo log-log.
+
+As vari?veis relacionadas ? hip?tese te?rica mostram que no modelo linear apenas o PIB ? estatisticamente significante a 5%. O sinal positivo do coeficiente associado ao PIB est? de acordo com a hip?tese levantada. O aumento de 100 d?lares no PIB gera um aumento de 1,16 kWh no uso de energia renov?vel, ceteris paribus. A vari?vel popula??o, neste caso, n?o ? estatisticamente significante na determina??o do maior uso da energia renov?vel. Quanto ao modelo, pode-se concluir pelo teste F que o mesmo ? estatisticamente significante a qualquer n?vel de signific?ncia.
+
+Pode-se testar a hip?tese de maior uso de energia renov?vel no Grupo das sete economias mais avan?adas (G7) em rela??o ao resto do mundo. Para isto, inclui-se uma vari?vel bin?ria em que 1 representa o uso de energia renov?vel dos pa?ses do G7 e 0 para o caso contr?rio.
+
+```{r}
+sigla = dados_transversal$codigo
+
+d1=as.numeric(sigla=='DEU')
+d2=as.numeric(sigla=='CAN')
+d3=as.numeric(sigla=='USA')
+d4=as.numeric(sigla=='ITA')
+d5=as.numeric(sigla=='FRA')
+d6=as.numeric(sigla=='JPN')
+d7=as.numeric(sigla=='GBR')
+
+binaria_G7 = d1 + d2 + d3 + d4 + d5 + d6 + d7
+
+linear.bin <- lm(renovavel ~ pib + populacao + binaria_G7, data = dados_transversal)
+#summary(linear.bin)
+
+stargazer(linear, linear.bin, digits = 4, type = 'text',
+          column.labels = c('Linear', 'Linear-Bin?ria'),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'), out = "mdw.txt")
+```
+
+Os pa?ses do G7 usam, em m?dia, mais de 3,5 milh?es de kwh de energia renov?vel a mais que os demais pa?ses. No entanto, a hip?tese n?o ? validada, pois a nula n?o ? rejeitada; isto ?, a vari?vel bin?ria ? estatisticamente insignificante. Logo, mant?m-se com a especifica??o do modelo linear.
+
+Feito isso, verifica-se a possibilidade de endogeneidade na vari?vel pib. O problema de endogeneidade pode ocorrer devido a tr?s fatores: (1) omiss?o de vari?veis relevantes correlacionadas ao pib; (2) erros de medi??o com o pib (e.g. uma proxy mal especificada); (3) simultaneidade entre y (renovavel) e uma ou mais vari?veis explicativas (pib e populacao). Para este trabalho, testa-se o caso (1), em que se considera existir uma vari?vel de controle associada ao PIB e que n?o deve ser omitida do modelo, uma vez que se teria um modelo com vi?s de especifica??o. Sup?e-se dois modelos: o primeiro possui, supostamente, vi?s ao omitir vari?veis; o segundo considera vari?veis (proxies) de controle associadas ? demanda por energia, as quais ajudam a explicar o uso de energia renov?vel e est?o associadas ao PIB. Estas vari?veis s?o o uso de energia per capita e o consumo de eletricidade per capita.
+
+```{r}
+modelo_vies <- lm(renovavel ~ pib + populacao, data = dados_transversal)
+#summary(modelo_vies)
+
+modelo_sem_vies <- lm(renovavel ~ pib + populacao + energia + eletricidade, 
+                      data = dados_transversal)
+#summary(modelo_sem_vies)
+
+stargazer(modelo_vies, modelo_sem_vies, digits = 4, type = 'text', 
+          column.labels = c('Linear', 'Linear com Controles'),
+          keep.stat = NULL, out = "mdw.txt")
+```
+
+Uma vez que a inclus?o das vari?veis de controle n?o melhorou a signific?ncia dos estimadores ou o valor do $R^2$, mant?m-se o modelo original.
+
+Uma desvantagem da an?lise com dados em corte transversal s?o os limitados graus de liberdade. Isso significa que ? poss?vel incluir apenas um conjunto restrito de vari?veis no modelo de regress?o; caso contr?rio, reduz-se sua efici?ncia: a vari?ncia tende a se tornar muito elevada e os testes de hip?tese inv?lidos. Por outro lado, omitir vari?veis pode gerar estimativas tendenciosas. A principal forma de enfrentar este trade-off entre efici?ncia e vi?s ? aumentar o n?mero de observa??es (n). Para um mesmo n?mero de ind?viduos (pa?ses) a solu??o passa por incluir mais per?odos. Para o caso analisado, ? poss?vel estender o per?odo da amostra para um intervalo maior que 2010. A base do WDI do Banco Mundial permite analisar os per?odos de 1960 a 2018. Para lidar com esses dados alguns modelos s?o considerados.
+
+Uma alternativa ? usar o m?todo OLS com dados empilhados. Os resultados s?o descritos a seguir comparando-os ao modelo com dados em corte transversal.
+
+```{r}
+transversal <- lm(renovavel ~ pib + populacao, data = dados_transversal)  #modelo linear com dados cross-section
+#summary(transversal)
+
+dados_painel <- Data_Renewable
+#View(dados_painel)
+head(dados_painel)
+
+empilhado1 <- lm(renovavel ~ pib + populacao, data = dados_painel)
+#summary(empilhado1)
+
+stargazer(transversal, empilhado1, type = 'text', digits = 4,
+          column.labels = c("Tranversal", "Empilhado(1)"),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+
+ano = dados_painel$ano
+n = length(ano)
+periodo = rep(0,n)
+for(i in 1:n){if(ano[i]>=1973)periodo[i]=1}
+periodo = cbind(ano,periodo)
+#View(periodo)
+
+empilhado2 <- lm(renovavel ~ pib + populacao + periodo, data = dados_painel)
+
+int_pibperiodo <- dados_painel$pib*periodo
+
+empilhado3 <- lm(renovavel ~ pib + populacao + periodo + int_pibperiodo, data = dados_painel)
+
+stargazer(empilhado2, empilhado3, type = 'text', digits = 4,
+          column.labels = c("Empilhado(2)", "Empilhado(3)"),
+          keep.stat = NULL, out = "mdr.txt")
+```
+
+Nota-se que s?o descritas tr?s especifica??es para o modelo com dados empilhados: (i) intercepto e coeficientes angulares constantes; (ii) intercepto diferente e coeficientes angulares constantes; e (iii) intercepto e e coeficientes angulares diferentes. Assim, permite-se identificar mudan?as na rela??o entre o crescimento econ?mico e a produ??o de energia renov?vel ao longo do tempo. Embora o $R^2$ n?o aumente nos modelos com dados empilhados, a vari?vel popula??o passa a ser estatisticamente significante.
+
+Alternativamente, pode-se estar interessado em controlar os efeitos de vari?veis omitidas no modelo e que se sup?e relevantes. Assim, ? poss?vel usar estimadores que permitem controlar os efeitos dessas vari?veis omitidas sobre as demais. Esse controle pode ser feito por meio da cria??o de bin?rias para cada pa?s da amostra menos um. Este ? m?todo ? feito por meio do estimador de efeitos fixos. O problema disso ? que se gastam muitos graus de liberdade e, consequentemente, reduz-se a efici?ncia do modelo. Outro m?todo ? tratar os efeitos das vari?veis omitidas como valores aleat?rios; isto ?, por meio do estimador de efeitos aleat?rios incorpora-se o efeito das vari?veis omitidas (as quais s?o tratadas com uso de bin?rias no estimador de efeitos fixos) dentro do erro de previs?o. ? uma alternativa v?lida quando n?o se deseja reduzir a efici?ncia do modelo. No entanto, o uso do estimador de efeitos aleat?rios requer que a correla??o entre as vari?veis explicativas e o erro de previs?o seja igual ou pr?xima a zero.
+
+Os resultados estimados para o modelo linear de corte transversal, modelo com dados empilhados e os modelos com estimadores fixos e aleat?rios s?o descritos a seguir.
+
+```{r}
+dados_painel <- plm.data(dados_painel, index=c("pais","ano"))
+#View(dados_painel)
+
+################################
+
+#Para transformar o atributo de um objeto (identificar a coluna pais como n?mero ao inv?s de categoria):
+
+#pais <- dados_painel[3]
+#summary(pais)
+#dados_painel$pais <- as.numeric(dados_painel$pais)
+#is.numeric(dados_painel$pais)
+#View(pais)
+
+#################################
+
+painel.fe1 <- plm(renovavel ~ log(pib) + log(populacao), data = dados_painel, index = c("pais", "ano"), 
+                  model = "within") #modelo de efeitos fixos - transforma??o within
+#summary(painel.fe1)  #O coeficiente do PIB indica quanto aumenta a energia de fontes renov?veis em kWh, em m?dia por pa?s, quando o PIB aumenta em uma unidade monet?ria.
+#fixef(painel.fe1)  #Exibe os efeitos fixos (constantes para cada pa?s)
+pFtest(painel.fe1, empilhado1)  ##h0: OLS ? melhor que fixed
+
+painel.fe2 <- plm(cbind(renovavel) ~ cbind(log(pib), log(populacao), as.factor(pais)), 
+                  data = dados_painel, index = c("pais", "ano"), effect = "twoway", 
+                  model = "within") #controla-se por munic?pio e ano, e n?o apenas munic?pio. Insere-se, portanto, novas bin?rias ao ano
+
+stargazer(empilhado1, painel.fe1, painel.fe2, type = 'text', digits = 4, 
+          column.labels = c("Empilhado", "Fixos-Oneway", "Fixos-Twoway"), 
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'), out = "jh.txt")
+
+pFtest(painel.fe1, empilhado1)  ##h0: OLS ? melhor que fixed
+
+painel.re1 <- plm((renovavel) ~ log(pib) + log(populacao), data = dados_painel, 
+                  index = c("pais", "ano"), model = "random")
+#summary(painel.re1)
+
+painel.re2 <- plm(cbind(renovavel) ~ cbind(log(pib), log(populacao), as.factor(ano)), 
+                  data = dados_painel, index = c("pais", "ano"), 
+                  model = "random")
+#summary(painel.re2)
+
+stargazer(painel.re1, painel.re2, type = 'text', digits = 4, 
+          column.labels = c("Aleat?rios-Oneway", "Aleat?rios-Twoway"), 
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+
+phtest(painel.fe1, painel.re1)
+#phtest(painel.fe2, painel.re2)
+```
+
+O modelo com estimador de efeitos fixos por pa?s (oneway) indica que a energia de fontes renov?veis aumenta 0,017 kWh, em m?dia por pa?s, quando o PIB aumenta em uma unidade monet?ria, ceteris paribus. Mais uma vez, a popula??o n?o foi estatisticamente significante. Uma extens?o desse modelo ? modelo twoway. Neste, controla-se, al?m dos efeitos entre os pa?ses, o efeito entre os per?odos (anos). Assim, o aumento em uma unidade monet?ria do PIB gera um aumento m?dio, por pa?s e ano, de 0,017 kWh na produ??o de energia renov?vel. O teste F em rela??o aos efeitos por pa?s (e por pa?s e ano) rejeita a nula em que afirma ser o modelo OLS melhor que o modelo com estimador de efeitos fixos.
+
+O modelo com estimador aleat?rio por pa?s (oneway) 
+Multiplicador de Lagrange de Breusch-Pagan para efeitos aleat?rios:
+
+```{r}
+pool <- plm(renovavel ~ pib + populacao, data = dados_painel, model = "pooling")
+#summary(pool)
+plmtest(pool, type=c("bp"))  #h0: n?o h? efeito de painel (ou seja, melhor OLS). Isto ?, h? efeito de painel.
+```
+
+Teste de depend?ncia transversal:
+
+```{r}
+pcdtest(painel.fe1, test = c("lm"))  #h0: n?o h? depend?ncia transversal
+pcdtest(painel.fe1, test = c("cd"))
+```
+
+Teste de correla??o serial:
+
+
+```{r}
+bptest(renovavel ~ pib + populacao + factor(pais), data = dados_painel, studentize = F)  #h0: n?o h? correla??o serial
+```
+
+Teste de Heterocedasticidade:
+
+```{r}
+bptest(renovavel ~ pib + populacao + factor(pais), data = dados_painel, studentize=F)  #h0: o modelo ? homoced?stico
+```
+
+Controlando a heteroscedasticidade:
+
+```{r}
+coeftest(painel.fe1)
+coeftest(painel.fe1, vcovHC(painel.fe1, method = "arellano"))
+painel.fe1.consistent <- coeftest(painel.fe1, vcovHC(painel.fe1, method = "arellano"))  #arellano - heteroscedasticidade e correla??o serial. Recomendado para efeitos fixos.
+
+stargazer(painel.fe1, painel.fe1.consistent, type = 'text', digits = 4, 
+          column.labels = c('Fixos - Oneway', 'Fixos-Oneway-Consistente'), 
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'), out = "mdf.txt")
+```
+

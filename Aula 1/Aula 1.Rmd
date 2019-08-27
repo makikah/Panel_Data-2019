@@ -1,0 +1,102 @@
+---
+title: "Multiple Regression, Lesson 1"
+author: "Henri Makika"
+date: "Julho 01, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## Import data with information for CO2, GDP and % manufacturing 
+
+```{r}
+library(readr)
+library(stargazer)
+Data_CO2 <- read_csv("Data_CO2.csv")
+head(Data_CO2)
+```
+
+## Linear Regression by OLS
+
+```{r}
+countries = Data_CO2
+ols1 <- lm(co2 ~ gdp + ind, data = countries)
+#stargazer(ols1, type = "text", digits = 8, column.labels = c("Linear model"),
+         # keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+
+```
+
+## Interpretação dos resultados
+
+*Céteris paribus*, se o PIB varie de uma unidade, o CO2 varie de 0.003. As variáveis consideradas são estatisticamente significantes, a hipótese nula : $H_0: \beta_1 = \beta_2 = 0$ e a alternativa : $H_1: \beta_1 \neq \beta_2 \neq 0$, no nosso caso a hipótese nula é rejeitada. Isso significa que as variáveis consideradas explicam perfeitamente o modelo estimado.   
+
+## Lesson 2
+
+
+### Model log-lin 
+
+
+```{r}
+ols2 = lm(log(co2) ~ gdp + ind, data = countries)
+```
+
+### Model lin-log
+
+```{r}
+ols3 = lm(co2 ~ log(gdp) + ind, data = countries)
+```
+
+### Model log-log
+
+```{r}
+ols4 = lm(log(co2) ~ log(gdp) + ind, data = countries)
+
+stargazer(ols1, ols2, ols3, ols4, type = "text", digits = 8, 
+          column.labels = c("Linear", "Log-lin", "Lin-log", "Log-log"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+On choisit le modèle log-log pour que le coefficient de détermination $R^2$ est supérieur de tous les autres modèles adjustés. 
+
+
+## Model with binary variable
+
+```{r}
+countries$brics = 0
+
+countries$brics[countries$country == "BRA" | countries$country == "RUS" | 
+                  countries$country == "IND" | countries$country == "CHN" |
+                  countries$country == "ZAF"] <- 1
+```
+
+## Log-log model with binary
+
+```{r}
+ols5 = lm(log(co2) ~ log(gdp) + ind + brics, data = countries)
+ols6 = lm(co2 ~ gdp + ind + brics, data = countries)
+
+stargazer(ols5, ols6, type = "text", digits = 8, column.labels = c("Log-log Binary",
+                                                                   "Linear"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+$\Delta ln(co2) = \frac{\Delta co2}{co2} = 93 \%$ 
+
+## Para ter a variação exata 
+```{r}
+exp(ols5$coefficients[4]) -1 
+```
+
+$\Delta ln(co2) = \frac{\Delta co2}{co2} = 154 \%$ Os Brics emitem mais co2 $154 \%$ em comparação ao outros países.  
+
+
+
+
+
+
+
+
+
+

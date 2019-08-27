@@ -1,0 +1,121 @@
+---
+title: "Exercício 1"
+author: "Henri Makika"
+date: "Julho 01, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      fig.width = 12, fig.height = 8)
+```
+
+## Exercício 1 
+
+The dataset Data_TravelCosts.csv contains information on travel costs from several municipalities to a national park in Brazil (see MAIA, A. G. , ROMEIRO, A. . Validade e
+confiabilidade do método de custo de viagem: um estudo aplicado ao Parque Nacional da Serra Geral. Revista de Economia Aplicada, v. 12, p. 103-123, 2008):
+
+a) Analyze the relation between travel costs and the visit rate;
+b) Add control variables in the linear model;
+c) Are the estimates consistent with the microeconomic theory?
+
+### Leitura de dados
+
+```{r}
+library(readxl)
+library(stargazer)
+
+Data_TravelCosts <- read_excel("~/Videos/Inverno 2019/Exercicios/Data_TravelCosts.xls")
+
+Dados = Data_TravelCosts
+
+head(Dados)
+```
+
+### a) Analyze the relation between travel costs and the visit rate;
+
+
+```{r}
+linearsimples = lm(rvisit ~ cost, data = Dados)
+
+#stargazer(linearsimples, type = "text", digits = 8, column.labels = c("Linear model"),
+ #         keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+### b) Add control variables in the linear model;
+
+```{r}
+linear = lm(rvisit ~ cost + incpc + age, data = Dados)
+
+#stargazer(linear, type = "text", digits = 8, column.labels = c("Multiple model"),
+         # keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+
+### c) Are the estimates consistent with the microeconomic theory?
+
+
+### d) Model Lin-log 
+
+```{r}
+linearlog = lm(rvisit ~ log(cost) + log(incpc) + age, data = Dados)
+```
+
+## e) Model Log-lin
+
+
+```{r}
+loglinear = lm(log(rvisit) ~ cost + incpc + age, data = Dados)
+```
+
+### f) Model Log-log
+
+```{r}
+logloglinear = lm(log(rvisit) ~ log(cost) + log(incpc) + age, data = Dados)
+
+stargazer(linear, linearlog, loglinear, logloglinear, type = "text", digits = 8, 
+          column.labels = c("Linear", "Lin-log", "Log-lin", "Log-log"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+Nous choisissons le modèle log-log où le $R^2$ est supérieur aux autres modèles. 
+
+### Model with binary variable
+
+
+```{r}
+code = Dados$code
+n = length(code)
+binary = rep(0, n)
+
+for (i in 1:n) {if(code[i]>=4301000 & (code[i]<4399999))binary[i] = 1}
+```
+
+### Log-log model with binary
+
+```{r}
+loglogbinary = lm(log(rvisit) ~ log(cost) + log(incpc) + age + binary, data = Dados)
+
+stargazer(loglogbinary, type = "text", digits = 8, column.labels = c("binary model"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+
+```{r}
+exp(loglogbinary$coefficients[5]) - 1
+```
+
+$\frac{\Delta ln (visit)}{\Delta rio grand do sud}$ la population de rio grande do sul visita mais doque o outro estado $(69 \%)$. 
+
+
+```{r}
+stargazer(linear, linearlog, loglinear, logloglinear, loglogbinary, type = "text", 
+          digits = 5, column.labels = c("Linear", "Lin-log", "Log-lin", 
+                                        "Log-log", "Loglog-binary"),
+          keep.stat = c('n','rsq','adj.rsq','f'), out = "mrd.txt")
+```
+
+
+
+
+

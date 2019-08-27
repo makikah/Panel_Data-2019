@@ -1,0 +1,386 @@
+---
+title: "Impact de la croissance économique sur l'utilisation des énergies renouvelables"
+author: "Henri Makika^[State University of Campinas, São Paulo. E-mail : hd.makika@gmail.com]"
+date: "Julho 15, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      fig.width = 8, fig.height = 6)
+```
+
+## Introduction 
+
+Ce travail présente et discute des résultats d'un modèle de régression linéaire analysant l'impact de la croissance économique sur l'utilisation de l'énergie produite à partir de sources renouvelables. On suppose que lorsque les revenus des économies augmentent, un processus de remplacement des sources d’énergie fossiles par des sources plus propres (renouvelables) se produit. Dans la première partie, un modèle classique basé sur la méthode des moindres carrés ordinaires (MCO) est utilisé afin d'estimer les résultats pour l'année 2010; le modèle de données de panel est ensuite utilisé pour évaluer une période plus longue de 1960 à 2018. Les données ont été extraites des indicateurs de développement dans le monde (*world development indicators*) de la Banque mondiale.
+
+## Estimation et Discussion des résultats
+
+Les données suivantes extraites des indicateurs de développement dans le monde de la Banque mondiale sont utilisées:
+
+```{r}
+library(readxl)       # Pour lire les fichiers Excel
+library(dplyr)        # Pour la manipulation des données
+library(stargazer)    # Pour construire des tableaux
+library(lmtest)       # Pour réaliser les tests d'autocorrélation sérielle
+library(normtest)     # Pour réaliser les tests de normalité des résidus
+library(car)          # Pour exécuter le test de Hausman
+library(plm)          # Pour estimer le modèle en panel
+library(knitr)        # Pour Kable
+```
+
+### Importation et Exploration des données 
+
+```{r}
+Data_Renewable <- read_excel("~/Videos/Inverno 2019/Ensaio/Data_Renewable.xlsx",
+                             na = "..")
+dados_transversal <- Data_Renewable %>% filter(ano==2010)
+summary(dados_transversal[,5:9]) %>% kable(digits = 0)
+```
+
+Les données utilisées se rapportent à l'année 2010 contenant 217 observations (pays). Les variables suivantes sont prises en compte tout au long du travail:
+
+*renouvelable* est la production d'énergie à partir de sources renouvelables en kWh, à l'exclusion de l'hydroélectricité;
+
+*PIB* représente le produit intérieur brut en USD aux prix de 2010;
+
+*population* est la population totale;
+
+*électricité* est la consommation d'électricité en kWh par habitant;
+
+*énergie* représente la consommation d'énergie en kWh par habitant.
+
+### Représentation graphique 
+
+```{r}
+par(mfrow = c(2,3))
+plot(dados_transversal$renovavel, type = "h", lwd = 3, main = "Renouvelable", 
+     xlab = "Pays", ylab = "Fréquence")
+plot(dados_transversal$pib, type = "h", lwd = 3, main = "PIB", xlab = "Pays", 
+     ylab = "Fréquence")
+plot(dados_transversal$populacao, type = "h", lwd = 3, main = "Population", 
+     xlab = "Pays", ylab = "Fréquence")
+plot(dados_transversal$eletricidade, type = "h", lwd = 3, main = "Électricité", 
+     xlab = "Pays", ylab = "Fréquence")
+plot(dados_transversal$energia, type = "h", lwd = 3, main = "Énergie", 
+     xlab = "Pays", ylab = "Fréquence")
+
+par(mfrow = c(1, 1))
+boxplot(dados_transversal[,5:9])
+```
+
+On suppose que la production d’énergie renouvelable (renouvelable) dépend positivement du produit intérieur brut (PIB) et négativement de la population (population). Il est avancé que les pays ayant un PIB plus élevé ont tendance, au fil du temps, à remplacer les sources d’énergie fossiles par des sources plus propres; Les pays plus peuplés ont tendance à consommer plus d'énergie fossile. Ce qui a été dit peut être estimé au moyen d’un modèle de régression linéaire basé sur la méthode MCO sous la forme:
+
+$$\hat {renouvelable}_i = \hat \beta_0 + \hat \beta_1 pib_i + \hat \beta_2 population_i + \hat \mu_i$$
+
+Afin de trouver le meilleur ajustement dans la forme fonctionnelle du modèle ci-dessus, il convient de tester certaines spécifications. Les spécifications du modèle en linéaire, log-linéaire, linéaire-log et log-log sont décrites ci-dessous:
+
+```{r}
+linear <- lm(renovavel ~ pib + populacao, data = dados_transversal)
+
+linlog <- lm(renovavel ~ log(pib) + log(populacao), data = dados_transversal)
+
+loglin <- lm(log(renovavel+1) ~ pib + populacao, data = dados_transversal) 
+
+loglog <- lm(log(renovavel+1) ~ log(pib) + log(populacao), data = dados_transversal)
+
+stargazer(linear, linlog, loglin, loglog, digits = 4, type = 'text',
+          column.labels = c("", "", "", ""),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+```
+
+L'utilisation de (+ 1) dans la variable *renouvelable* est appliquée car il y a beaucoup de valeurs 0 dans le vecteur renouvelable.
+
+### Diagnostique de tests
+
+i. Test de normalité
+
+L’hypothèse nulle $H_0$ du test est que les résidus sont normalement distribué. Il sied de souligner que le rejet de l’hypothèse nulle ne signifie pas l’interprétation et l’analyse des résultats, juste pour suggérer seulement de la prudence. La non-normalité des résidus dans les analyses de séries macroéconomiques est courante dans les études conduisant au test de Jarque-Bera.
+
+```{r}
+jb.norm.test(linear$residuals)
+shapiro.test(linear$residuals)  
+
+jb.norm.test(linlog$residuals)
+shapiro.test(linlog$residuals)
+
+jb.norm.test(loglin$residuals)
+shapiro.test(loglin$residuals)
+
+jb.norm.test(loglog$residuals)
+shapiro.test(loglog$residuals)
+```
+
+L'hypothèse nulle peut être rejetée, les résidus ne sont pas normalement distribués pour nos quatre régressions. L’hypothèse nulle du test est que les résidus sont normalement distribué. Il sied de souligner que le rejet de l’hypothèse nulle ne signifie pas l’interprétation et l’analyse des résultats, juste pour suggérer seulement de la prudence. La non-normalité des résidus dans les analyses de séries macroéconomiques est courante dans les études conduisant au test de Jarque-Bera.
+
+ii. Test d'homoscédasticité
+
+En statistique, l'homoscédasticité est une propriété fondamentale du modèle de la régression linéaire générale et fait partie de ses hypothèses de base. On parle d'homoscédasticité lorsque la variance des erreurs stochastiques de la régression est la même pour chaque observation $i$ (de 1 à $n$ observations). La notion d'homoscédasticité s'oppose à celle d'hétéroscédasticité, qui correspond au cas où la variance de l'erreur des variables est différente. L'hypothèse nulle $H_0$ est la présence d'homoscédasticité et l'hypothèse alternative $H_1$ est l'hétéroscédasticité. 
+
+```{r}
+bptest(linear)  # rejet de l'hypothèse nulle
+bptest(linear, ~fitted(linear) + fitted(linear)^2)  # non rejet la nulle
+
+bptest(linlog)  # rejet de l'hypothèse nulle
+bptest(linlog, ~fitted(linlog) + fitted(linlog)^2)  # non rejet la nulle
+
+bptest(loglin)  # non rejet de l'hypothèse nulle
+bptest(loglin, ~fitted(loglin) + fitted(loglin)^2)  # non rejet la nulle
+
+bptest(loglog)  # rejet de l'hypothèse nulle
+bptest(loglog, ~fitted(loglog) + fitted(loglog)^2)  # non rejet la nulle
+```
+
+iii. Test de multicolinéarité 
+
+La multicolinéarité est le fait qu’une variable indépendente est prédictible par (ou partage sa variance avec) une combinaison linéaire des autres variables indépendentes du modèle estimé. Pour faire simple, disons qu'une combinaison linéaire est une variable que l'on obtient en faisant la somme pondérée de plusieurs autres variables. La fonctio $VIF$ (pour Variance Inflation Factor), donne la valeur réciproque de la tolérance. 
+
+Des valeurs élevées de $VIF$ indiquent donc la présence de multicolinéarité. L’utilité diagnostique de cet indice résulte du fait que la variance du coefficient de régression augmente de la même façon que le facteur d'inflation de la variance. Pour nos régressions nous remarquons aucun suspect de la multicolinéarité.  
+
+```{r}
+vif(linear)
+vif(linlog)
+vif(loglin)
+vif(loglog)
+```
+
+iv. Test de spécification du modèle
+
+En statistique, le test d’erreur de spécification de régression de Ramsey (RESET) est un test de spécification générale pour le modèle de régression linéaire. Plus spécifiquement, il teste si les combinaisons non linéaires des valeurs ajustées aident à expliquer la variable de réponse. L'intuition qui sous-tend le test est que si des combinaisons non linéaires des variables explicatives ont le pouvoir d'expliquer la variable de réponse. Ainsi, le modèle est mal spécifié en ce sens que le processus de génération de données pourrait être mieux approché par un polynôme ou un autre fonctionnel de la forme non linéaire. Pour notre cas, le modèle lolog qui est bien spécifié. 
+
+```{r}
+resettest(linear)
+resettest(linlog)
+resettest(loglin)
+resettest(loglog)
+```
+
+v. Critère d'informations
+
+Lorsque l'on estime un modèle statistique, il est possible d'augmenter la vraisemblance du modèle en ajoutant un paramètre par exemple. Le critère d'information d'Akaike (AIC), tout comme le critère d'information bayésien (BIC), permet de pénaliser les modèles en fonction du nombre de paramètres afin de satisfaire le critère de parcimonie. On choisit alors le modèle avec le critère d'information d'Akaike le plus faible.
+
+```{r}
+AIC(linear, linlog, loglin, loglog)
+BIC(linear, linlog, loglin, loglog)
+```
+
+Le modèle linéaire est choisi car c’est celui qui présente le meilleur ajustement en fonction du $R^2$ (voir le tableau ci-haut). De plus, le test de White n'a pas permis de vérifier les suspicions d'hétéroscédasticité et cela dans aucun des modèles; l'hypothèse de la normalité des résidus a été rejetée dans tous les modèles, selon les tests de Jarque-Bera et Shapiro-Wilk; et le test général de Ramsey-Reset on a rejeté l'hypothèse de spécification correcte pour tous les modèles, à l'exception du modèle loglog.
+
+L'hypothèse théorique montre que, dans le modèle linéaire, seul le PIB est statistiquement significatif à $5\%$. Le signe positif du coefficient associé au PIB conforme l'hypothèse émise. L'augmentation de 100 dollars du PIB génère une augmentation de 1.16 kWh de l'utilisation des énergies renouvelables, toutes choses étant égales par ailleurs. La variable population, dans ce cas, n’est pas statistiquement significative pour déterminer la plus grande utilisation des énergies renouvelables. En ce qui concerne le modèle, nous pouvons conclure du test F qu’il est statistiquement significatif à n’importe quel niveau de signification.
+
+On peut tester l'hypothèse d'une utilisation accrue des énergies renouvelables dans le groupe des sept économies les plus avancées (G7) par rapport au reste du monde. Pour cela, une variable binaire est incluse où 1 représente l'utilisation de l'énergie renouvelable des pays du G7 et 0 dans le cas contraire.
+
+```{r}
+sigla = dados_transversal$codigo
+
+d1=as.numeric(sigla=='DEU')   # Allemagne
+d2=as.numeric(sigla=='CAN')   # Canada
+d3=as.numeric(sigla=='USA')   # Etats-Unis d'Amérique
+d4=as.numeric(sigla=='ITA')   # Italie
+d5=as.numeric(sigla=='FRA')   # France
+d6=as.numeric(sigla=='JPN')   # Japon
+d7=as.numeric(sigla=='GBR')   # Grande Brétagne
+
+binaria_G7 = d1 + d2 + d3 + d4 + d5 + d6 + d7
+
+linear.bin <- lm(renovavel ~ pib + populacao + binaria_G7, data = dados_transversal)
+
+stargazer(linear, linear.bin, digits = 4, type = 'text', column.labels = c("", ""),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'), out = "mdw.txt")
+```
+
+Les pays du G7 utilisent en moyenne plus de 3,5 millions de kwh d'énergie renouvelable de plus que les autres pays. Cependant, l'hypothèse n'est pas validée, puisque l'hypothèse nulle de la significance de la variable *binaria_G7* n'est pas rejetée. c'est-à-dire que la variable binaire est statistiquement non significative. Par conséquent, il est maintenu avec la spécification du modèle linéaire.
+
+Une fois que cela est fait, la possibilité d'endogénéité dans la variable pib est vérifiée. Le problème d'endogénéité peut survenir en raison de trois facteurs: (1) l'omission de variables pertinentes corrélées au PIB; (2) des erreurs de mesure avec la variable PIB (par exemple un proxy mal spécifié); (3) la simultanéité entre y (renouvelable) et une ou plusieurs variables explicatives (PIB et population). Pour ce travail, nous testons le cas (1), où elle est considérée comme une variable de contrôle associée au PIB et ne devrait pas être omise du modèle, car il y aurait un modèle avec biais de spécification. Deux modèles sont supposés: le premier a, supposément, un biais lorsqu’on omet des variables; la seconde considère les variables de contrôle associées (variables de remplacement) est la demande en énergie, ce qui aide à expliquer l'utilisation des énergies renouvelables et est associée au PIB. Ces variables sont la consommation d'énergie par habitant et la consommation d'électricité par habitant.
+
+```{r}
+modelo_vies <- lm(renovavel ~ pib + populacao, data = dados_transversal)
+
+modelo_sem_vies <- lm(renovavel ~ pib + populacao + energia + eletricidade, 
+                      data = dados_transversal)
+
+stargazer(modelo_vies, modelo_sem_vies, digits = 4, type = 'text', 
+          column.labels = c("", ""), keep.stat = NULL, out = "mdw.txt")
+```
+
+Puisque l'inclusion des variables de contrôle (instrument) n'a pas amélioré la significance des estimateurs ni de la valeur de $R^2$, le modèle d'origine est conservé.
+
+L’analyse transversale des données présente l’inconvénient de limiter les degrés de liberté. Cela signifie qu'il est possible d'inclure uniquement un ensemble restreint de variables dans le modèle de régression; sinon, son efficacité est réduite: la variance a tendance à devenir très élevée et les tests d'hypothèses sont souvent invalides. En revanche, l’omission de variables peut générer des estimations biaisées. Le principal moyen de remédier à ce compromis entre efficacité et biais consiste à augmenter le nombre d'observations (n). Pour le même nombre d'individus (pays), la solution consiste à inclure plus de périodes. Pour le cas étudié, il est possible d'étendre la période d'échantillonnage à un intervalle supérieur à 2010. La base de données WDI de la Banque mondiale permet d'analyser les périodes de 1960 à 2018. Certains modèles sont considérés pour traiter ces données.
+
+Une alternative consiste à utiliser la méthode OLS avec des données empilées. Les résultats sont décrits ci-dessous en les comparant au modèle avec les données transversales.
+
+```{r}
+dados_painel <- Data_Renewable
+
+summary(dados_painel[,1:4]) %>% kable(digits = 0)
+
+```
+
+```{r}
+dados_painel <- Data_Renewable
+
+summary(dados_painel[,5:9]) %>% kable(digits = 0)
+```
+
+
+
+
+```{r}
+lpib = log(dados_painel$pib)
+lpop = log(dados_painel$populacao)
+lrenov = log(dados_painel$renovavel + 1)
+lener = log(dados_painel$energia + 1)
+
+
+transversal <- lm(lrenov ~ lpib + lpop + lener, data = dados_transversal)  
+
+empilhado1 <- lm(lrenov ~ lpib + lpop + lener, data = dados_painel)
+
+stargazer(transversal, empilhado1, type = 'text', digits = 4, column.labels = c("", "1"),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'))
+```
+
+
+```{r}
+dados_painel <- Data_Renewable
+ano = dados_painel$ano
+n = length(ano)
+periodo = rep(0,n)
+for(i in 1:n){if(ano[i]>=1973)periodo[i]=1}
+
+empilhado2 <- lm(lrenov ~ lpib + lpop + lener + periodo, data = dados_painel)
+
+int_pibperiodo <- dados_painel$pib*periodo
+
+empilhado3 <- lm(lrenov ~ lpib + lpop + lener + periodo + int_pibperiodo, 
+                 data = dados_painel)
+
+stargazer(empilhado1, empilhado2, empilhado3, type = 'text', digits = 3, 
+          column.labels = c("1", "2", "3"), keep.stat = NULL, out = "mdr.txt")
+```
+
+Il convient de noter que trois spécifications sont décrites pour le modèle avec des données empilées: (1) des coefficients angulaires d’interception et constants; (2) différents coefficients angulaires d'interception et constants; et (3) intercept et différents coefficients angulaires. Ainsi, il est possible d'identifier des changements dans la relation entre croissance économique et production d'énergie renouvelable au fil du temps. Bien que le $R^2$ n'augmente pas dans les modèles avec des données empilées, la variable population devient statistiquement significative.
+
+Une autre solution consiste à contrôler les effets des variables omises dans le modèle et supposés pertinents. Ainsi, il est possible d'utiliser des estimateurs permettant de contrôler les effets de ces variables omises sur les autres. Ce contrôle peut être effectué en créant des binaires pour chaque pays de l’échantillon moins un. Cette méthode est réalisée via l'estimateur à effets fixes. Le problème, c’est que de nombreux degrés de liberté sont utilisés et que, par conséquent, l’efficacité du modèle est réduite. Une autre méthode consiste à traiter les effets des variables omises comme des valeurs aléatoires, c'est-à-dire que, par le biais de l'estimateur à effets aléatoires, l'effet des variables omises (traitées avec une utilisation binaire dans l'estimateur à effets fixes) dans l'erreur de prédiction est incorporé. C'est une alternative valable quand on ne veut pas réduire l'efficacité du modèle. Cependant, l’utilisation de l’estimateur à effets aléatoires exige que la corrélation entre les variables explicatives et l’erreur de prédiction soit égale ou proche de zéro.
+
+Les résultats estimés pour le modèle linéaire en coupe transversalle, le modèle de données empilées et les modèles avec des estimateurs fixes et aléatoires sont décrits ci-dessous.
+
+i. Modèle à effets fixes (within and twoway)
+
+```{r}
+dados_painel <- plm.data(dados_painel, index=c("pais","ano"))
+
+lpib = log(dados_painel$pib)
+lpop = log(dados_painel$populacao)
+lrenov = log(dados_painel$renovavel + 1)
+lener = log(dados_painel$energia + 1)
+
+painel.fe1 <- plm(lrenov ~ lpib + lpop + lener, data = dados_painel, 
+                  model = "within")
+
+painel.fe2 <- plm(lrenov ~ lpib + lpop + lener, data = dados_painel, 
+                  effect = "twoway", model = "within")
+
+stargazer(empilhado1, painel.fe1, painel.fe2, type = 'text', digits = 3, 
+          column.labels = c("Empile1", "Fixe-Oneway", "Fixe-Twoway"), 
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'), out = "inesh.txt")
+```
+
+Le modèle d'estimation à effets fixes pour pays (unidirectionnels) indique que la consommation d'énergie provenant de sources renouvelables augmente en moyenne de $8.9\%$ par pays lorsque le PIB augmente de $1\%$, toutes choses étant égales par ailleurs. L’augmentation de $1 \%$ de la population entraîne une chute de la consommation d'énergie renouvelable par pays de $3.9 \%$ en moyenne, *ceteris paribus*. Dans le modèle *two-way*, en plus des effets entre pays, l'effet entre périodes (années) est contrôlé. Ainsi, l’augmentation de $1 \%$ du PIB génère pour chaque pays une augmentation moyenne de $3.7 \%$ de l’utilisation des énergies renouvelables, *ceteris paribus. L’augmentation annuelle de la population de $1 \%$ réduit la consommation d’énergie renouvelable par pays de $6.7 \%$ en moyenne, ceteris paribus. La consommation d'électricité est statistiquement significative à $10 \%$ dans les deux modèles, bien que le signal soit inversé par rapport au modèle empilé et qu'il existe une perte d'efficacité due aux restrictions imposées à l'estimateur à effets fixes.
+
+ii. Modèle à effets aléatoires
+
+```{r}
+painel.re1 <- plm(lrenov ~ lpib + lpop + lener, data = dados_painel,  
+                  model = "random")
+
+painel.re2 <- plm(lrenov ~ lpib + lpop + lener, data = dados_painel, 
+                  effect = "twoways", model = "random")
+
+stargazer(empilhado1, painel.re1, painel.re2, type = 'text', digits = 4, 
+          column.labels = c("Empile1", "Oneway", "Twoway"),
+          keep.stat = c('n', 'rsq', 'adj.rsq', 'f'), out = "inesd.txt")
+```
+
+Le modèle avec estimateur à effets aléatoires présente une interprétation similaire à celle du cas précédent lors de l'analyse de la valeur des coefficients. Cependant, comme il est plus parcimonieux, moins de degrés de liberté sont consommés par rapport à l'estimateur à effets fixes. Ceci implique des tests d'hypothèses plus robustes (gain d'efficacité). Cependant, les estimations ne sont fiables que si la condition $cor(X, c_i)=0$ est vérifiée. Sinon, l'estimateur à effets fixes devrait être utilisé.
+
+Le test de Hausman est un moyen d’estimer quel estimateur est le plus approprié. Les paramètres des estimateurs à effets fixes et aléatoires sont comparés. Si les deux sont statistiquement égaux, l’estimateur à effets aléatoires est choisi, car il est plus parcimonieux (plus efficace).
+
+```{r}
+phtest(painel.fe1, painel.re1)
+phtest(painel.fe2, painel.re2)
+```
+
+Dans le modèle unidirectionnel (c'est-à-dire où les effets des variables omises sont contrôlés entre pays), le modèle le plus approprié, selon le test de Hausman, est l'estimateur à effets fixes, l'hypothèse nulle des coefficients statistiquement egaux est rejetée. De même, dans le modèle *two-way* (c'est-à-dire lorsque les effets des variables omises entre pays et périodes sont contrôlés), l'estimateur à effets fixes est indiqué comme étant le plus approprié.
+
+## Conclusion
+
+L'analyse des données de panel permet de générer des estimations permettant de résoudre le problème de l'endogénéité en économétrie. D'une part, l'inclusion d'un plus grand nombre d'observations augmente la variabilité de l'échantillon et l'efficacité estimée du modèle; d'autre part, il est possible de contrôler les variables importantes omises afin de générer des estimations non biaisées.
+
+Cela dit, les résultats du cas analysés entre la croissance économique (PIB et population) et l'utilisation des énergies renouvelables confirment l'hypothèse initiale. Les signaux de tous les modèles analysés indiquent que la croissance économique, toutes choses étant égales par ailleurs, augmente l’utilisation des énergies renouvelables. L'estimateur à effets fixes, parmi les modèles analysés, s'est révélé le plus approprié pour cette évaluation.
+
+## Textes sources
+
+ANGRIST, J.; PISCHKE, J. **Mostly harmless econometrics: An empiricist’s Companion**. Princeton University Press, 2009.
+
+BALTAGI, B.H. **Econometric analysis of Panel Data**. 2nd edition, John Wiley & Sons. 2002.
+
+MAIA, A.G. **Econometria: conceitos e aplicações**. Editora Saint Paul, 2017.
+
+WOOLDRIDGE, J.M. **Econometric analysis of Cross Section and Panel Data**. 2nd edition. Massachusetts. The MIT Press. 2007.
+
+## Appendice
+
+### Test de dépendence sérielle
+
+```{r}
+pcdtest(painel.fe1, test = c("lm"))  
+pcdtest(painel.fe1, test = c("cd"))
+```
+
+### Test de corrélation sérielle
+
+```{r}
+bptest(renovavel ~ pib + populacao + factor(pais), data = dados_painel, studentize = F)
+```
+
+### Test d'hétéroscédasticité
+
+```{r}
+bptest(renovavel ~ pib + populacao + factor(pais), data = dados_painel, 
+       studentize = FALSE)
+```
+
+### Contrôle d'hétéroscédasticité
+
+```{r}
+coeftest(painel.fe1)
+coeftest(painel.fe1, vcovHC(painel.fe1, method = "arellano"))
+
+painel.fe1.consistent <- coeftest(painel.fe1, vcovHC(painel.fe1, method = "arellano"))  
+
+stargazer(painel.fe1, painel.fe1.consistent, type = 'text', digits = 4, 
+          column.labels = c("P.f1", "P.f1consistent"), keep.stat = NULL, 
+          out = "mdf.txt")
+
+pool <- plm(renovavel ~ pib + populacao, data = dados_painel, model = "pooling")
+
+plmtest(pool, type=c("bp"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
